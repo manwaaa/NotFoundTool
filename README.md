@@ -74,6 +74,9 @@ create table if not exists not_found_reboxes (
   books jsonb not null default '[]'::jsonb
 );
 
+-- Disable Row Level Security so all warehouse stations can sync and read boxes
+alter table not_found_reboxes disable row level security;
+
 -- 2. Enable Realtime updates (idempotent)
 do $$
 begin
