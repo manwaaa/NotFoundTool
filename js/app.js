@@ -1494,6 +1494,7 @@ function parseSheetData(rawText) {
 
   // Check header row
   let startIndex = 0;
+  let colIndex = -1;
   let colIsbn = -1;
   let colTitle = -1;
   let colBox = -1;
@@ -1501,55 +1502,112 @@ function parseSheetData(rawText) {
   const header = rawRows[0].map(h => (h || '').toLowerCase().trim());
   const isHeader = header.some(h => 
     h.includes('isbn') || h.includes('barcode') || h.includes('title') || 
-    h.includes('book') || h.includes('box') || h.includes('count') || h === '#'
+    h.includes('book') || h.includes('box') || h === '#' || h === 'no' || h === 'no.' || h === 'count'
   );
 
   if (isHeader) {
     startIndex = 1;
+    colIndex = header.findIndex(h => h === '#' || h === 'no' || h === 'no.' || h === 'count' || h === 'item' || h === 'index');
     colIsbn = header.findIndex(h => h.includes('isbn') || h.includes('barcode') || h.includes('ean'));
-    colTitle = header.findIndex(h => h.includes('title') || h.includes('book') || h.includes('item') || h.includes('name'));
+    colTitle = header.findIndex(h => h.includes('title') || h.includes('book') || h.includes('name'));
     colBox = header.findIndex(h => h.includes('box') || h.includes('package') || h.includes('bin') || h.includes('rebox'));
   }
 
-  // Smart column mapping if no explicit headers found
-  if (colBox === -1 && colIsbn === -1 && colTitle === -1) {
-    const sample = rawRows[startIndex] || [];
-    if (sample.length === 1) {
-      colIsbn = 0;
-      colBox = -1;
-    } else if (sample.length === 2) {
-      const c0 = (sample[0] || '').trim();
-      const c1 = (sample[1] || '').trim();
-      const c0IsBox = /^(box[-\s]?)?\d{1,4}$/i.test(c0) || /^RB[-\s]?\d{1,4}$/i.test(c0);
-      const c1IsBox = /^(box[-\s]?)?\d{1,4}$/i.test(c1) || /^RB[-\s]?\d{1,4}$/i.test(c1);
+  // Automatic multi-row heuristic column detection if columns unassigned
+  if (colBox === -1 || (colIsbn === -1 && colTitle === -1)) {
+    const dataRows = rawRows.slice(startIndex, Math.min(startIndex + 15, rawRows.length));
+    const numCols = dataRows.reduce((max, r) => Math.max(max, r.length), 0);
 
-      if (c0IsBox && !c1IsBox) {
-        colBox = 0;
-        colIsbn = 1;
-      } else if (c1IsBox && !c0IsBox) {
-        colBox = 1;
-        colIsbn = 0;
-      } else if (/^\d{8,14}$/.test(c0.replace(/[^0-9X]/gi, ''))) {
-        colIsbn = 0;
-        colBox = 1;
-      } else if (/^\d{8,14}$/.test(c1.replace(/[^0-9X]/gi, ''))) {
-        colIsbn = 1;
-        colBox = 0;
-      } else {
-        colIsbn = 0;
-        colBox = 1;
-      }
-    } else if (sample.length >= 3) {
-      sample.forEach((cell, idx) => {
-        const val = cell.trim();
-        if (colBox === -1 && (/^(box[-\s]?)?\d{1,4}$/i.test(val) || /^RB[-\s]?\d{1,4}$/i.test(val))) {
-          colBox = idx;
-        } else if (colIsbn === -1 && /^\d{8,14}$/.test(val.replace(/[^0-9X]/gi, ''))) {
-          colIsbn = idx;
+    const colProfiles = [];
+    for (let c = 0; c < numCols; c++) {
+      let isSequential = true;
+      let isbnMatchCount = 0;
+      let titleMatchCount = 0;
+      let smallIntCount = 0;
+      let distinctValues = new Set();
+
+      dataRows.forEach((r, idx) => {
+        const val = (r[c] || '').trim();
+        distinctValues.add(val);
+        const intVal = parseInt(val, 10);
+        // Sequential check (e.g. 1, 2, 3...)
+        if (intVal !== idx + 1 && intVal !== idx) {
+          isSequential = false;
+        }
+        // Small int check (e.g. 1, 2, ... <= 500)
+        if (/^\d{1,4}$/.test(val)) {
+          smallIntCount++;
+        }
+        // Clean ISBN check (8 to 18 digits or ending with X)
+        const cleanD = val.replace(/[^0-9X]/gi, '');
+        if (cleanD.length >= 8 && cleanD.length <= 18 && !/[a-wy-z]/i.test(val)) {
+          isbnMatchCount++;
+        }
+        // Title check (contains multiple letters or words)
+        if (/[a-zA-Z]{3,}/.test(val)) {
+          titleMatchCount++;
         }
       });
-      if (colBox === -1) colBox = sample.length - 1;
-      if (colIsbn === -1) colIsbn = (colBox === 0 ? 1 : 0);
+
+      colProfiles.push({
+        col: c,
+        isSequential: isSequential && dataRows.length > 1,
+        isbnRatio: isbnMatchCount / (dataRows.length || 1),
+        titleRatio: titleMatchCount / (dataRows.length || 1),
+        smallIntRatio: smallIntCount / (dataRows.length || 1),
+        distinctCount: distinctValues.size
+      });
+    }
+
+    // 1. Identify Row Index Column (1, 2, 3, 4...)
+    let identifiedIndexCol = colIndex;
+    if (identifiedIndexCol === -1) {
+      const idxCandidate = colProfiles.find(p => p.isSequential && p.isbnRatio < 0.5 && p.col === 0);
+      if (idxCandidate) {
+        identifiedIndexCol = idxCandidate.col;
+      }
+    }
+
+    // 2. Identify ISBN Column
+    if (colIsbn === -1) {
+      const isbnCandidate = colProfiles.find(p => p.col !== identifiedIndexCol && p.isbnRatio >= 0.5);
+      if (isbnCandidate) {
+        colIsbn = isbnCandidate.col;
+      }
+    }
+
+    // 3. Identify Title Column
+    if (colTitle === -1) {
+      const titleCandidate = colProfiles.find(p => p.col !== identifiedIndexCol && p.col !== colIsbn && p.titleRatio >= 0.5);
+      if (titleCandidate) {
+        colTitle = titleCandidate.col;
+      }
+    }
+
+    // 4. Identify Box Column
+    if (colBox === -1) {
+      const boxCandidates = colProfiles.filter(p => p.col !== identifiedIndexCol && p.col !== colIsbn && p.col !== colTitle);
+      if (boxCandidates.length > 0) {
+        const smallIntCol = boxCandidates.find(p => p.smallIntRatio >= 0.5);
+        if (smallIntCol) {
+          colBox = smallIntCol.col;
+        } else {
+          colBox = boxCandidates[boxCandidates.length - 1].col;
+        }
+      } else if (numCols === 2) {
+        if (colIsbn === 0) colBox = 1;
+        else if (colIsbn === 1) colBox = 0;
+      }
+    }
+
+    // Fallback if ISBN/Title still not mapped
+    if (colIsbn === -1 && colTitle === -1) {
+      const remainingCols = colProfiles.filter(p => p.col !== identifiedIndexCol && p.col !== colBox);
+      if (remainingCols.length > 0) {
+        colIsbn = remainingCols[0].col;
+      } else {
+        colIsbn = (colBox === 0 ? 1 : 0);
+      }
     }
   }
 
