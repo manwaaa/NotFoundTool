@@ -73,8 +73,19 @@ create table if not exists not_found_reboxes (
   books jsonb not null default '[]'::jsonb
 );
 
--- 2. Enable Realtime updates
-alter publication supabase_realtime add table not_found_reboxes;
+-- 2. Enable Realtime updates (idempotent)
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'not_found_reboxes'
+  ) then
+    alter publication supabase_realtime add table not_found_reboxes;
+  end if;
+end $$;
 
 -- 3. Create atomic sequence for guaranteed sequential numbering
 create sequence if not exists rebox_counter_seq start 1;
