@@ -384,6 +384,20 @@ function copySupabaseSql() {
   }
 }
 
+const DEFAULT_SUPABASE_URL = 'https://paizlgzyylvcwfwfwusw.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_ijU8ECGh2hKAZo1FUmPTaw_koet73o7';
+
+function cleanSupabaseUrl(url) {
+  if (!url) return '';
+  let u = url.trim();
+  u = u.replace(/\/rest\/v1\/?$/, '');
+  u = u.replace(/\/+$/, '');
+  if (!u.startsWith('http://') && !u.startsWith('https://')) {
+    u = 'https://' + u;
+  }
+  return u;
+}
+
 async function initCloudSync() {
   let cloudConfig = null;
 
@@ -394,7 +408,7 @@ async function initCloudSync() {
       const data = await resp.json();
       if (data && data.enabled && data.config) {
         cloudConfig = data.config;
-        console.log('Detected Supabase config from Vercel environment variables.');
+        console.log('Detected Supabase config from Vercel endpoint.');
       }
     }
   } catch (e) {
@@ -404,6 +418,14 @@ async function initCloudSync() {
   // 2. Fallback to localStorage saved config
   if (!cloudConfig) {
     cloudConfig = getSavedCloudConfig();
+  }
+
+  // 3. Fallback to project defaults
+  if (!cloudConfig || !cloudConfig.supabaseUrl) {
+    cloudConfig = {
+      supabaseUrl: DEFAULT_SUPABASE_URL,
+      supabaseAnonKey: DEFAULT_SUPABASE_ANON_KEY
+    };
   }
 
   if (cloudConfig && cloudConfig.supabaseUrl && cloudConfig.supabaseAnonKey) {
@@ -421,7 +443,8 @@ async function connectToSupabase(config) {
       return;
     }
 
-    supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+    const validUrl = cleanSupabaseUrl(config.supabaseUrl);
+    supabaseClient = window.supabase.createClient(validUrl, config.supabaseAnonKey);
     isCloudConnected = true;
     setCloudStatus(true, config);
 
@@ -514,8 +537,8 @@ function setCloudStatus(connected, config = null) {
 
 function openCloudConfigModal() {
   const cfg = getSavedCloudConfig() || {};
-  document.getElementById('cfgSupabaseUrl').value = cfg.supabaseUrl || '';
-  document.getElementById('cfgSupabaseAnonKey').value = cfg.supabaseAnonKey || '';
+  document.getElementById('cfgSupabaseUrl').value = cfg.supabaseUrl || DEFAULT_SUPABASE_URL;
+  document.getElementById('cfgSupabaseAnonKey').value = cfg.supabaseAnonKey || DEFAULT_SUPABASE_ANON_KEY;
   document.getElementById('cfgStationName').value = currentOperatorName;
   openModal('cloudConfigModal');
 }
@@ -530,7 +553,7 @@ function getSavedCloudConfig() {
 }
 
 function saveAndConnectCloud() {
-  const supUrl = (document.getElementById('cfgSupabaseUrl').value || '').trim();
+  const supUrl = cleanSupabaseUrl(document.getElementById('cfgSupabaseUrl').value || '');
   const anonKey = (document.getElementById('cfgSupabaseAnonKey').value || '').trim();
   const station = (document.getElementById('cfgStationName').value || '').trim();
 
@@ -546,7 +569,7 @@ function saveAndConnectCloud() {
   }
 
   const config = {
-    supabaseUrl: supUrl.startsWith('http') ? supUrl : `https://${supUrl}`,
+    supabaseUrl: supUrl,
     supabaseAnonKey: anonKey
   };
 
