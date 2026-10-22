@@ -483,6 +483,15 @@ async function fetchAndSyncSupabaseRegistry() {
 
     if (!error && Array.isArray(data)) {
       localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(data));
+      let maxCloudNum = 0;
+      data.forEach(r => {
+        const match = (r.rebox_number || '').match(/\d+/);
+        if (match) {
+          const num = parseInt(match[0], 10);
+          if (num > maxCloudNum) maxCloudNum = num;
+        }
+      });
+      localStorage.setItem(STORAGE_KEY_COUNTER, String(maxCloudNum));
       updateReboxCountStat();
       updateUiState();
       if (document.getElementById('registryModal')?.classList.contains('active')) {
