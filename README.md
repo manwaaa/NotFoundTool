@@ -1,8 +1,9 @@
 # NotFoundTool
 
-> **Not Found Rebox Terminal** — Specialized intake & physical box aggregation tool for uncataloged / "Not Found" inventory. Styled to match **iBookTrack**.
+> **Not Found Rebox Terminal** — Specialized intake & physical box aggregation tool for uncataloged / "Not Found" inventory with multi-user real-time synchronization.
 
 ![Tech Stack](https://img.shields.io/badge/Stack-HTML5%20%7C%20CSS3%20%7C%20Vanilla%20JS-blue)
+![Multi User](https://img.shields.io/badge/Multi--User-Atomic%20Sync-brightgreen)
 ![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-brightgreen)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-success)
 
@@ -10,19 +11,156 @@
 
 ## 📌 Overview
 
-During warehouse intake operations for projects like **Mustang**, **Jaguar**, and **Journal**, physical books that cannot be found in digital shipment manifests or catalog databases need to be segregated and aggregated into dedicated physical boxes called **Reboxes** (`RB-xxxx`).
+During warehouse intake operations, physical books that cannot be found in digital shipment manifests or catalog databases need to be segregated and aggregated into dedicated physical boxes called **Reboxes** (`RB-xxxx`).
 
 **NotFoundTool** provides scan operators and warehouse managers with:
-1. **Fast physical barcode intake** with hardware scanner support (`Enter` submit) and camera detection.
-2. **Incremental Rebox assignment** (`RB-0001`, `RB-0002`, `RB-0003`...) when sealing a package.
-3. **Manager ISBN Tracer**: Instant search to locate which Rebox, lot, and project contains any specific physical ISBN.
-4. **Box Inspection & Label Printing**: View complete manifests, print physical box labels, and export CSV reports.
+1. **Multi-User Atomic Box Number Assignment**: Guarantees zero duplicate box numbers across 10+ concurrent warehouse operators. For example, if User 5 finishes 1st, they atomically claim `RB-0001`; when User 7 finishes 2nd, they claim `RB-0002`.
+2. **Dual Barcode & Manual Title Intake**: Rapid hardware scanner support (`Enter` submit) for ISBN barcodes, plus manual title typing for books without ISBNs.
+3. **Bulk Spreadsheet & CSV Import**: Copy-paste or upload inventory sheets with columns like `COUNT, ISBN / TITLE, BOX #` to migrate historical data or load batches.
+4. **Real-Time Warehouse Cloud Sync**: Syncs newly closed boxes across all operator screens instantly with attribution (`Sealed By`).
+5. **Manager ISBN & Title Tracer**: Instant search to locate which Rebox contains any specific physical ISBN or book title.
+6. **Box Inspection & Label Printing**: View complete manifests, print physical box labels, and export CSV reports.
 
 ---
 
-## 🚀 Quick Start
+## 👥 Multi-User Concurrency & Supabase Deployment
 
-**NotFoundTool** requires no build steps, Node modules, or external servers.
+In a high-throughput warehouse with ~10 concurrent packing stations, isolated browser storage causes collisions where multiple users seal distinct physical packages with the same box number.
+
+NotFoundTool solves this through **server-side atomic locking** using **Supabase (PostgreSQL Sequences & Stored Procedures)** paired with **Vercel Serverless Functions**.
+
+### How Atomic Counter Allocation Works:
+```
++----------------+      +----------------+      +----------------+
+| Station 5 (1st)|      | Station 7 (2nd)|      | Station 2 (3rd)|
++--------+-------+      +--------+-------+      +--------+-------+
+         |                       |                       |
+         | 1. claim_next_rebox() |                       |
+         +---------------------->| (PostgreSQL sequence) |
+         |                       |                       |
+         | 2. Returns RB-0001    | 3. claim_next_rebox() |
+         |<----------------------+---------------------->|
+         |                       | 4. Returns RB-0002    |
+                                 |<----------------------+
+                                                         | 5. claim_next_rebox()
+                                                         +---------------------->
+                                                         | 6. Returns RB-0003
+```
+
+- When an operator clicks **"📦 Assign Box No. & Close"**, PostgreSQL executes `nextval('rebox_counter_seq')` inside an atomic transaction.
+- Because PostgreSQL sequences are strictly serial and ACID-compliant, **no two stations can ever receive the same box number**, even if they submit within the exact same millisecond.
+- Supabase Realtime immediately broadcasts the newly closed box to all other workstations so everyone's **Next Rebox Preview** stays synchronized.
+
+---
+
+### ⚡ 2-Minute Supabase + Vercel Setup (Free Tier)
+
+#### Step 1: Run SQL in Supabase
+1. Go to [Supabase](https://supabase.com/) and create a free project (e.g. `not-found-warehouse`).
+2. In your Supabase Dashboard, click **SQL Editor** &rarr; **New Query**.
+3. Paste the following SQL script and click **Run**:
+
+```sql
+-- 1. Create table for closed Reboxes
+create table if not exists not_found_reboxes (
+  id bigint generated by default as identity primary key,
+  rebox_number text unique not null,
+  sealed_by text default 'Operator',
+  assigned_at timestamptz not null default now(),
+  assigned_at_formatted text,
+  book_count integer not null default 0,
+  status text default 'Closed',
+  books jsonb not null default '[]'::jsonb
+);
+
+-- 2. Enable Realtime updates
+alter publication supabase_realtime add table not_found_reboxes;
+
+-- 3. Create atomic sequence for guaranteed sequential numbering
+create sequence if not exists rebox_counter_seq start 1;
+
+-- 4. Atomic Stored Procedure: Claim Single Box
+create or replace function claim_next_rebox(p_operator text, p_books jsonb)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  next_val bigint;
+  rb_str text;
+  now_ts timestamptz := now();
+  fmt_date text;
+  new_row not_found_reboxes%rowtype;
+begin
+  next_val := nextval('rebox_counter_seq');
+  rb_str := 'RB-' || lpad(next_val::text, 4, '0');
+  fmt_date := to_char(now_ts, 'Mon DD, YYYY, HH12:MI AM');
+
+  insert into not_found_reboxes (
+    rebox_number, sealed_by, assigned_at, assigned_at_formatted, book_count, status, books
+  ) values (
+    rb_str, coalesce(p_operator, 'Operator'), now_ts, fmt_date, jsonb_array_length(p_books), 'Closed', p_books
+  ) returning * into new_row;
+
+  return to_jsonb(new_row);
+end;
+$$;
+
+-- 5. Atomic Stored Procedure: Claim Batch Boxes (For CSV/Sheet Import)
+create or replace function claim_next_reboxes_batch(p_operator text, p_boxes jsonb)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  box_item jsonb;
+  next_val bigint;
+  rb_str text;
+  now_ts timestamptz := now();
+  fmt_date text;
+  new_rows jsonb := '[]'::jsonb;
+  inserted_row not_found_reboxes%rowtype;
+begin
+  fmt_date := to_char(now_ts, 'Mon DD, YYYY, HH12:MI AM');
+
+  for box_item in select * from jsonb_array_elements(p_boxes)
+  loop
+    next_val := nextval('rebox_counter_seq');
+    rb_str := 'RB-' || lpad(next_val::text, 4, '0');
+
+    insert into not_found_reboxes (
+      rebox_number, sealed_by, assigned_at, assigned_at_formatted, book_count, status, books
+    ) values (
+      rb_str, coalesce(p_operator, 'Import'), now_ts, fmt_date, jsonb_array_length(box_item->'books'), 'Closed', box_item->'books'
+    ) returning * into inserted_row;
+
+    new_rows := new_rows || to_jsonb(inserted_row);
+  end loop;
+
+  return new_rows;
+end;
+$$;
+```
+
+#### Step 2: Deploy to Vercel
+1. Connect this GitHub repository to [Vercel](https://vercel.com/).
+2. In **Project Settings &rarr; Environment Variables**, add:
+   - `SUPABASE_URL`: `https://your-project-ref.supabase.co`
+   - `SUPABASE_ANON_KEY`: `eyJhbGciOi...` *(find in Supabase &rarr; Project Settings &rarr; API)*
+3. Click **Deploy**.
+
+#### Step 3: Automatic Operator Connection
+- The included Vercel serverless function (`/api/config`) provides the Supabase configuration to all connected workstations automatically.
+- When warehouse operators open the URL, the top navigation pill displays `🟢 Cloud: Live (Supabase)`.
+- Operators simply type their Station ID (e.g. `Station 5`) in the **Operator / Station ID** field.
+
+> **Local Fallback Mode**: If running without Supabase or offline, the tool automatically operates in standalone mode using browser `localStorage`.
+
+---
+
+## 🚀 Quick Start (Local Run)
+
+**NotFoundTool** requires no build steps, Node modules, or complex dependencies.
 
 ### Method 1: Direct File Open
 Double-click `index.html` in Windows Explorer or open it in any web browser (`Chrome`, `Edge`, `Firefox`).
@@ -36,9 +174,6 @@ python -m http.server 8080
 npx serve .
 ```
 
-### Method 3: Deploy to Vercel or GitHub Pages
-The repository includes `vercel.json` for zero-configuration static deployment to Vercel, or can be hosted directly via GitHub Pages.
-
 ---
 
 ## 🖥️ User Interface & Workflow
@@ -47,31 +182,37 @@ The interface follows a streamlined 3-panel workflow matching the warehouse term
 
 ```
 +--------------------------+------------------------------+----------------------------------+
-|  1. SETUP & LOT PIPELINE | 2. BARCODE SCANNER TERMINAL  | 3. BOX CONTENTS FEED             |
+|  1. REBOX STATUS         | 2. RECORD TERMINAL           | 3. RECORDED BOOKS FEED           |
 |                          |                              |                                  |
-|  - Select Project        | - Barcode Scanner Input      | - Live feed of scanned books     |
-|  - Select Lot Number     | - Mobile Camera Scanner      | - Issue Flagging (Brittle, etc.) |
-|  - Active Rebox Card     | - Current Box Counter        | - Remove entry action            |
-|  - Search RB in Lot      | - [📦 Assign Box & Close]    | - Sort: Newest / Oldest First    |
-|  - Return to Dashboard   | - [➔ Start Next Box]         | - Total counter badge            |
+|  - Active Rebox Card     | - Operator / Station ID      | - Live feed of scanned books     |
+|  - Next Rebox Preview    | - Barcode Scanner & Titles   | - Issue Flagging (Brittle, etc.) |
+|  - Lookup & Inspect RB   | - Camera Scanner & CSV Import| - Remove entry action            |
+|  - Cloud Status Indicator| - Current Box Counter        | - Sort: Newest / Oldest First    |
+|                          | - [📦 Assign Box & Close]    | - Total counter badge            |
+|                          | - [➔ Start Next Box]         |                                  |
 +--------------------------+------------------------------+----------------------------------+
 ```
 
-### 1. Setup & Lot Pipeline (Column 1)
-- **Project Selection**: Choose `Mustang`, `Jaguar`, or `Journal`.
-- **Lot Number Selection**: Select active warehouse lots (e.g., `Lot-150`, `Lot-116`, `Lot-113`, `Lot-01`, `Lot-02J`) or enter a custom lot identifier.
+### 1. Rebox Status (Column 1)
 - **Active Rebox Package Indicator**: Displays `NOT ASSIGNED (n)` during scanning, updating dynamically to `RB-xxxx (ASSIGNED & CLOSED)` upon closure.
-- **Search RB Boxes in Lot**: Rapidly look up and inspect closed boxes within the active project and lot.
+- **Next Sequential Rebox Preview**: Displays the upcoming Rebox ID before closure, synced in real time across all active warehouse workstations.
+- **Lookup & Inspect Rebox**: Rapidly look up and inspect closed packages.
+- **Cloud Status Badge**: Shows live connection state (`🟢 Live Sync` or `⚪ Local Mode`). Clicking opens the Cloud Configuration modal.
 
-### 2. Barcode Scanner Terminal (Column 2)
+### 2. Record Terminal (Column 2)
+- **Operator Attribution**: Operator name or Station ID field (`Station 1`, `Station 5`, `Alice`), automatically tagged to all sealed boxes.
+- **Barcode & Manual Title Acceptance**: Automatically detects whether an entry is an ISBN barcode or a manually entered book title (for uncataloged books with no ISBN).
 - **USB / Bluetooth Scanner Support**: Autofocused input listening for rapid `Enter` key events from 1D/2D barcode scanners.
+- **Immediate Intake**: Zero setup required — start scanning or typing immediately.
+- **Bulk Sheet Import (`📥 Import Sheet / CSV`)**: Directly paste copied columns from Google Sheets / Excel (e.g. `COUNT, ISBN / TITLE, BOX #`) or upload `.csv`/`.tsv` files. Automatically reserves atomic box numbers when importing into the registry.
 - **Camera Barcode Detection**: Integrated mobile / webcam barcode reader utilizing the browser's native `BarcodeDetector` API.
 - **Duplicate Prevention**: Rejects duplicate ISBN scans within the same package.
-- **Assign Box No. & Close**: Automatically increments and seals the box with the next Rebox ID (e.g. `RB-0001` &rarr; `RB-0002` &rarr; `RB-0003`...).
+- **Assign Box No. & Close**: Atomically claims the next Rebox ID on the cloud database (e.g. `RB-0001` &rarr; `RB-0002` &rarr; `RB-0003`...).
 - **Start Next Box**: Resets the pending scan session and prepares the scanner for the subsequent box.
 
-### 3. Box Contents Feed (Column 3)
+### 3. Recorded Books Feed (Column 3)
 - Real-time list of all scanned books in the current package with sequence numbers (`#1`, `#2`, `#3`...).
+- **Visual Distinctions**: Clear visual badges differentiating barcode ISBNs from manual book titles (`📖 Manual Title (No ISBN)`).
 - **Defect Flagging**: Tag individual books as `Normal`, `⚠️ Brittle`, `⚠️ Torn Pages`, `⚠️ Stained`, or `🔄 Mismatch`.
 - **Item Removal**: Delete accidentally scanned books before box sealing.
 - **Sorting Toggle**: Switch between `Newest First` and `Oldest First`.
@@ -80,38 +221,38 @@ The interface follows a streamlined 3-panel workflow matching the warehouse term
 
 ## 🔍 Manager Audit & Tracking Features
 
-### Global ISBN Tracer (`🔍 Trace Any ISBN`)
-Managers can type or scan any ISBN into the top navigation tracer modal to immediately retrieve:
+### Global Item Tracer (`🔍 Trace Any Item`)
+Managers can type or scan any ISBN or book title into the tracer modal to immediately retrieve:
 - Assigned Rebox number (`RB-xxxx`)
-- Associated Project and Lot Number
-- Date and time sealed
+- Operator who sealed the package
+- Matched book title or barcode details
+- Book count and date sealed
 - Direct link to open the complete box manifest
 
 ### Rebox Master Registry (`📋 Rebox Master Registry`)
-- Historical log of all closed Rebox packages.
-- Filter by Rebox number, Project, or Lot.
-- **Bulk CSV Export**: Download complete records of all historical packages.
+- Historical log of all closed Rebox packages across all stations.
+- Filter by Rebox number, Operator, or ISBN/Title.
+- **Bulk CSV Export**: Download complete records of all historical packages with operator attribution.
 
 ### Inspection & Box Label Printing
-- **Print Box Label**: Generates a standard high-contrast physical box label with oversized `RB-xxxx` typography, lot info, book count, and date.
+- **Print Box Label**: Generates a standard high-contrast physical box label with oversized `RB-xxxx` typography, book count, operator, and date.
 - **Export CSV**: Download an individual CSV manifest for any specific Rebox package.
 
 ---
 
-## 💾 Local Storage Schema
+## 💾 Storage & Data Architecture
 
-All data persists in the browser via `localStorage`:
-
-| Key | Description |
-|---|---|
-| `ibooktrack_not_found_reboxes` | Array of closed Rebox objects containing metadata and book lists. |
-| `ibooktrack_not_found_rb_counter` | Current highest sequential Rebox number integer. |
-| `ibooktrack_not_found_active_session` | Current in-progress session (Project, Lot, pending book list, status). |
+| Layer | Location | Purpose |
+|---|---|---|
+| **Cloud Atomic Sequence** | PostgreSQL: `rebox_counter_seq` | Server-side sequence guaranteeing strictly atomic, collision-free `RB-xxxx` numbers. |
+| **Cloud Rebox Registry** | Supabase: `not_found_reboxes` | Centralized PostgreSQL table of all closed Reboxes synchronized across all workstations via Realtime. |
+| **Local Cache & Fallback** | Browser `localStorage` | Caches registry, active unsealed scans, and offline fallback counter. |
 
 ---
 
 ## 🎨 Design System
-Styled in alignment with **iBookTrack**:
+High-efficiency warehouse terminal layout:
 - **Palette**: Indigo primary (`#4f46e5`), Slate neutral background (`#f8fafc`), Emerald accents (`#10b981`), Amber warnings (`#f59e0b`).
 - **Typography**: Inter for UI controls and JetBrains Mono for ISBNs and box numbers.
-- **Audio Feedback**: Built-in POS scanner beeps, success chimes, and alert tones via the Web Audio API without audio file dependencies.
+- **Audio Feedback**: Built-in POS scanner beeps, success chimes, and alert tones via the Web Audio API without external audio files.
+
