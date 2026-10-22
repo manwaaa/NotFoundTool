@@ -123,7 +123,7 @@ function getNextIncrementalRbNumber() {
   const storedCounter = parseInt(localStorage.getItem(STORAGE_KEY_COUNTER) || '0', 10);
   const nextNum = Math.max(maxNum, storedCounter) + 1;
   localStorage.setItem(STORAGE_KEY_COUNTER, String(nextNum));
-  return `RB-${String(nextNum).padStart(4, '0')}`;
+  return `BOX-${String(nextNum).padStart(4, '0')}`;
 }
 
 function peekNextRbNumber() {
@@ -138,7 +138,7 @@ function peekNextRbNumber() {
   });
   const storedCounter = parseInt(localStorage.getItem(STORAGE_KEY_COUNTER) || '0', 10);
   const nextNum = Math.max(maxNum, storedCounter) + 1;
-  return `RB-${String(nextNum).padStart(4, '0')}`;
+  return `BOX-${String(nextNum).padStart(4, '0')}`;
 }
 
 function saveActiveSession() {
@@ -335,7 +335,7 @@ declare
   new_row not_found_reboxes%rowtype;
 begin
   next_val := nextval('rebox_counter_seq');
-  rb_str := 'RB-' || lpad(next_val::text, 4, '0');
+  rb_str := 'BOX-' || lpad(next_val::text, 4, '0');
   fmt_date := to_char(now_ts, 'Mon DD, YYYY, HH12:MI AM');
 
   insert into not_found_reboxes (
@@ -368,7 +368,7 @@ begin
   for box_item in select * from jsonb_array_elements(p_boxes)
   loop
     next_val := nextval('rebox_counter_seq');
-    rb_str := 'RB-' || lpad(next_val::text, 4, '0');
+    rb_str := 'BOX-' || lpad(next_val::text, 4, '0');
 
     insert into not_found_reboxes (
       rebox_number, sealed_by, assigned_at, assigned_at_formatted, book_count, status, books
@@ -651,7 +651,7 @@ async function assignBoxAndClose() {
         });
         const storedCounter = parseInt(localStorage.getItem(STORAGE_KEY_COUNTER) || '0', 10);
         const nextNum = Math.max(maxNum, storedCounter) + 1;
-        nextRb = `RB-${String(nextNum).padStart(4, '0')}`;
+        nextRb = `BOX-${String(nextNum).padStart(4, '0')}`;
         localStorage.setItem(STORAGE_KEY_COUNTER, String(nextNum));
 
         newReboxRecord = {
@@ -716,6 +716,11 @@ async function assignBoxAndClose() {
 }
 
 function startNextBox() {
+  if (!currentAssignedRebox) {
+    showToast('Please assign and close the current box before starting a new box.', 'error');
+    return;
+  }
+
   // Clear active session
   currentScannedBooks = [];
   currentAssignedRebox = null;
@@ -724,69 +729,165 @@ function startNextBox() {
 
   document.getElementById('barcodeScannerInput').value = '';
   document.getElementById('barcodeScannerInput').focus();
-  showToast('Started new Rebox package. Terminal ready for next books.');
+  showToast('Started new Box. Terminal ready for next books.');
 }
 
 // ── UI State Synchronizer ───────────────────────────────────────────
+// ── UI State Synchronizer ───────────────────────────────────────────
 function updateUiState() {
   const count = currentScannedBooks.length;
-  document.getElementById('currentBoxCount').textContent = count;
-  document.getElementById('feedCountBadge').textContent = `Total: ${count}`;
+  const countEl = document.getElementById('currentBoxCount');
+  if (countEl) countEl.textContent = count;
+  const feedBadgeEl = document.getElementById('feedCountBadge');
+  if (feedBadgeEl) feedBadgeEl.textContent = `Total: ${count}`;
 
-  // Update Next Rebox Preview
+  // Update Next Box Preview
   const nextPreviewEl = document.getElementById('nextReboxPreview');
   if (nextPreviewEl) {
     nextPreviewEl.textContent = peekNextRbNumber();
   }
 
-  // Update Active Rebox Package Card
+  // Update Active Box Package Card
   const packageCard = document.getElementById('activeReboxCard');
   const packageTitle = document.getElementById('activeReboxTitle');
   const packageSub = document.getElementById('activeReboxSub');
   const boxStatus = document.getElementById('boxScanStatus');
   const btnAssign = document.getElementById('btnAssignBox');
+  const btnStartNext = document.getElementById('btnStartNextBox');
 
-  if (currentAssignedRebox) {
-    packageCard.classList.add('assigned');
-    packageTitle.textContent = currentAssignedRebox;
-    packageSub.textContent = `Assigned & Closed (${count} books sealed)`;
-    boxStatus.innerHTML = `<span class="status-dot" style="background:#10b981;"></span> Sealed: ${currentAssignedRebox}`;
-    btnAssign.disabled = true;
-    btnAssign.textContent = `✓ ${currentAssignedRebox} Closed`;
-  } else {
-    packageCard.classList.remove('assigned');
-    packageTitle.textContent = count > 0 ? `NOT ASSIGNED (${count})` : 'NOT ASSIGNED';
-    packageSub.textContent = 'Books scanned will be grouped into this box.';
-    boxStatus.innerHTML = `<span class="status-dot" style="background:#6366f1;"></span> Pending Assignment`;
-    btnAssign.disabled = count === 0;
-    btnAssign.innerHTML = `📦 Assign Box No. & Close`;
+  if (packageCard && packageTitle && packageSub && boxStatus && btnAssign) {
+    if (currentAssignedRebox) {
+      packageCard.classList.add('assigned');
+      packageTitle.textContent = currentAssignedRebox;
+      packageSub.textContent = `Assigned & Closed (${count} books sealed)`;
+      boxStatus.innerHTML = `<span class="status-dot" style="background:#10b981;"></span> Sealed: ${currentAssignedRebox}`;
+      btnAssign.disabled = true;
+      btnAssign.textContent = `✓ ${currentAssignedRebox} Closed`;
+
+      if (btnStartNext) {
+        btnStartNext.disabled = false;
+        btnStartNext.title = 'Start next box';
+      }
+    } else {
+      packageCard.classList.remove('assigned');
+      packageTitle.textContent = count > 0 ? `NOT ASSIGNED (${count})` : 'NOT ASSIGNED';
+      packageSub.textContent = 'Books scanned will be grouped into this box.';
+      boxStatus.innerHTML = `<span class="status-dot" style="background:#6366f1;"></span> Pending Assignment`;
+      btnAssign.disabled = count === 0;
+      btnAssign.innerHTML = `📦 Assign Box No. & Close`;
+
+      if (btnStartNext) {
+        btnStartNext.disabled = true;
+        btnStartNext.title = 'Assign and close current box first before starting next box';
+      }
+    }
   }
 
+  populateBoxDropdown();
   renderFeed();
 }
 
 function updateCounterDisplay() {
-  document.getElementById('currentBoxCount').textContent = currentScannedBooks.length;
+  const el = document.getElementById('currentBoxCount');
+  if (el) el.textContent = currentScannedBooks.length;
 }
 
 function updateReboxCountStat() {
   const registry = getStoredRegistry();
-  document.getElementById('reboxCountStat').textContent = `${registry.length} Closed Rebox${registry.length === 1 ? '' : 'es'}`;
+  const count = registry.length;
+  const statEl = document.getElementById('reboxCountStat');
+  if (statEl) {
+    statEl.textContent = `${count} Closed Box${count === 1 ? '' : 'es'}`;
+  }
+  populateBoxDropdown();
+}
+
+function populateBoxDropdown() {
+  const select = document.getElementById('boxSelectDropdown');
+  const datalist = document.getElementById('boxDatalistOptions');
+  const registry = getStoredRegistry();
+
+  if (select) {
+    const currentVal = select.value;
+    let selectHtml = `<option value="">-- Choose from ${registry.length} Closed Box${registry.length === 1 ? '' : 'es'} --</option>`;
+    registry.forEach(r => {
+      const num = r.rebox_number || '';
+      const bCount = r.book_count || (r.books || []).length;
+      const op = r.sealed_by || 'Operator';
+      const selected = (currentVal && currentVal === num) ? 'selected' : '';
+      selectHtml += `<option value="${escapeHtml(num)}" ${selected}>${escapeHtml(num)} — ${bCount} books (${escapeHtml(op)})</option>`;
+    });
+    select.innerHTML = selectHtml;
+  }
+
+  if (datalist) {
+    let dlHtml = '';
+    registry.forEach(r => {
+      const num = r.rebox_number || '';
+      const bCount = r.book_count || (r.books || []).length;
+      const op = r.sealed_by || 'Operator';
+      dlHtml += `<option value="${escapeHtml(num)}">${escapeHtml(num)} — ${bCount} books (${escapeHtml(op)})</option>`;
+    });
+    datalist.innerHTML = dlHtml;
+  }
+}
+
+function findBoxInRegistry(query) {
+  if (!query) return null;
+  const registry = getStoredRegistry();
+  const raw = query.trim().toUpperCase();
+  const clean = raw.replace(/[^A-Z0-9]/g, '');
+
+  return registry.find(r => {
+    const num = (r.rebox_number || '').toUpperCase();
+    const cleanNum = num.replace(/[^A-Z0-9]/g, '');
+    if (num === raw || cleanNum === clean) return true;
+
+    // Check numeric match e.g. "1" matches "BOX-0001" or "RB-0001"
+    const m1 = num.match(/\d+/);
+    const m2 = raw.match(/\d+/);
+    if (m1 && m2 && parseInt(m1[0], 10) === parseInt(m2[0], 10)) {
+      return true;
+    }
+    return false;
+  });
+}
+
+function handleDropdownSelect(val) {
+  if (!val) return;
+  const searchInput = document.getElementById('searchRbInput');
+  if (searchInput) searchInput.value = val;
+  const matched = findBoxInRegistry(val);
+  if (matched) {
+    openInspectModalForBox(matched);
+  }
+}
+
+function handleBoxSelect(val) {
+  if (!val) return;
+  const select = document.getElementById('boxSelectDropdown');
+  if (select) select.value = val;
+  const matched = findBoxInRegistry(val);
+  if (matched) {
+    openInspectModalForBox(matched);
+  }
 }
 
 // ── Feed Rendering ──────────────────────────────────────────────────
 function renderFeed() {
   const listContainer = document.getElementById('feedList');
-  const emptyState = document.getElementById('emptyFeedState');
+  if (!listContainer) return;
 
   if (currentScannedBooks.length === 0) {
-    listContainer.innerHTML = '';
-    listContainer.appendChild(emptyState);
-    emptyState.style.display = 'flex';
+    listContainer.innerHTML = `
+      <div id="emptyFeedState" class="empty-state">
+        <div class="empty-icon">📚</div>
+        <h3 class="empty-title">No Books Scanned Yet</h3>
+        <p class="empty-desc">Scan a barcode, enter an ISBN, or type a book title to record books into this box.</p>
+      </div>
+    `;
     return;
   }
-
-  emptyState.style.display = 'none';
 
   // Sort items
   const items = [...currentScannedBooks];
@@ -806,10 +907,10 @@ function renderFeed() {
           <span class="book-index">#${itemIdx}</span>
           <div class="book-details">
             ${isBarcode ? `
-              <span class="book-isbn">${book.isbn}</span>
-              <span class="book-title">${book.title && !book.title.startsWith('Physical Book') ? book.title : 'Physical Barcode'}</span>
+              <span class="book-isbn">${escapeHtml(book.isbn)}</span>
+              <span class="book-title">${escapeHtml(book.title && !book.title.startsWith('Physical Book') ? book.title : 'Physical Barcode')}</span>
             ` : `
-              <span class="book-title" style="font-size:13px; font-weight:700; color:var(--text-main);">${book.title}</span>
+              <span class="book-title" style="font-size:13px; font-weight:700; color:var(--text-main);">${escapeHtml(book.title)}</span>
               <span style="font-size:11px; font-weight:600; color:#d97706; display:flex; align-items:center; gap:4px;">
                 <span>📖</span> Manual Title (No ISBN)
               </span>
@@ -817,7 +918,7 @@ function renderFeed() {
           </div>
         </div>
         <div class="book-right">
-          <span class="book-time">${book.scanned_at}</span>
+          <span class="book-time">${escapeHtml(book.scanned_at)}</span>
           <select class="flag-select" onchange="changeBookFlag(${actualIndex}, this.value)" ${currentAssignedRebox ? 'disabled' : ''}>
             <option value="normal" ${book.flag === 'normal' ? 'selected' : ''}>Normal</option>
             <option value="brittle" ${book.flag === 'brittle' ? 'selected' : ''}>⚠️ Brittle</option>
@@ -840,7 +941,8 @@ function renderFeed() {
 
 function toggleSortOrder() {
   sortOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
-  document.getElementById('sortOrderLabel').textContent = sortOrder === 'newest' ? 'Newest First' : 'Oldest First';
+  const labelEl = document.getElementById('sortOrderLabel');
+  if (labelEl) labelEl.textContent = sortOrder === 'newest' ? 'Newest First' : 'Oldest First';
   renderFeed();
 }
 
@@ -865,25 +967,34 @@ function removeBookByIndex(idx) {
 }
 
 function handleRbSearchInput(e) {
-  if (e.key === 'Enter') {
+  const searchInput = document.getElementById('searchRbInput');
+  const query = (searchInput && searchInput.value ? searchInput.value : '').trim();
+  const select = document.getElementById('boxSelectDropdown');
+  if (select && query) {
+    const matched = findBoxInRegistry(query);
+    if (matched && matched.rebox_number) {
+      select.value = matched.rebox_number;
+    }
+  }
+  if (e && e.key === 'Enter') {
     inspectSearchedRbBox();
   }
 }
 
 function inspectSearchedRbBox() {
   const input = document.getElementById('searchRbInput');
-  const term = (input.value || '').trim().toUpperCase();
+  const select = document.getElementById('boxSelectDropdown');
+  const term = (input && input.value ? input.value : (select ? select.value : '')).trim();
   if (!term) {
-    showToast('Please type an RB box number (e.g. RB-0001).', 'error');
-    input.focus();
+    showToast('Please select or type a Box number (e.g. BOX-0001).', 'error');
+    if (input) input.focus();
     return;
   }
 
-  const registry = getStoredRegistry();
-  const matched = registry.find(r => (r.rebox_number || '').toUpperCase() === term || (r.rebox_number || '').replace(/-/g, '').toUpperCase() === term.replace(/-/g, ''));
+  const matched = findBoxInRegistry(term);
 
   if (!matched) {
-    showToast(`No record found for Rebox "${term}".`, 'error');
+    showToast(`No record found for Box "${term}".`, 'error');
     return;
   }
 
@@ -891,7 +1002,7 @@ function inspectSearchedRbBox() {
 }
 
 function openInspectModalForBox(boxRecord) {
-  document.getElementById('inspectModalTitle').textContent = `Rebox ${boxRecord.rebox_number} Manifest`;
+  document.getElementById('inspectModalTitle').textContent = `Box ${boxRecord.rebox_number} Manifest`;
   document.getElementById('inspectBoxNumber').textContent = boxRecord.rebox_number;
   document.getElementById('inspectBookCount').textContent = boxRecord.book_count || (boxRecord.books || []).length;
   document.getElementById('inspectOperator').textContent = boxRecord.sealed_by || 'Operator';
@@ -1026,7 +1137,7 @@ function traceBook(query) {
   } else {
     container.style.display = 'none';
     empty.style.display = 'block';
-    empty.textContent = `No Rebox record found matching "${query}".`;
+    empty.textContent = `No Box record found matching "${query}".`;
   }
 }
 
@@ -1034,7 +1145,7 @@ function traceIsbn(query) {
   traceBook(query);
 }
 
-// ── Master Rebox Registry ───────────────────────────────────────────
+// ── Master Box Registry ─────────────────────────────────────────────
 function openMasterRegistryModal() {
   renderMasterRegistry();
   openModal('registryModal');
@@ -1060,7 +1171,7 @@ function renderMasterRegistry() {
   document.getElementById('registryTotalCount').textContent = `${filtered.length} of ${registry.length} Boxes`;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: #94a3b8;">No Rebox packages recorded yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: #94a3b8;">No Box packages recorded yet.</td></tr>`;
     return;
   }
 
@@ -1095,11 +1206,11 @@ function viewRegistryBox(rbNumber) {
 function exportAllRegistryCsv() {
   const registry = getStoredRegistry();
   if (registry.length === 0) {
-    showToast('No Rebox records to export.', 'error');
+    showToast('No Box records to export.', 'error');
     return;
   }
 
-  let csv = 'Rebox_Number,Book_Count,Date_Closed,Sealed_By,ISBN_And_Titles_List\n';
+  let csv = 'Box_Number,Book_Count,Date_Closed,Sealed_By,ISBN_And_Titles_List\n';
   registry.forEach(r => {
     const isbns = (r.books || []).map(b => b.is_isbn !== false && b.isbn && b.isbn !== 'NO-ISBN' ? b.isbn : `[Title] ${b.title}`).join('; ');
     csv += `"${r.rebox_number}","${r.book_count || (r.books || []).length}","${r.assigned_at}","${(r.sealed_by || 'Operator').replace(/"/g, '""')}","${isbns.replace(/"/g, '""')}"\n`;
@@ -1109,10 +1220,10 @@ function exportAllRegistryCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `NotFound-All-Reboxes-${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `NotFound-All-Boxes-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('Exported Master Rebox Registry.');
+  showToast('Exported Master Box Registry.');
 }
 
 // ── Sheet / CSV Import Logic ────────────────────────────────────────

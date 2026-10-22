@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Not Found — Rebox Terminal</title>
+  <title>Not Found — Box Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -20,7 +20,7 @@
       <div>
         <div class="brand-title">
           Not Found
-          <span class="brand-badge">Rebox Terminal</span>
+          <span class="brand-badge">Box Terminal</span>
         </div>
         <div class="brand-subtitle">Specialized intake & physical box aggregation for uncataloged / not found books</div>
       </div>
@@ -34,7 +34,7 @@
 
       <div class="scanner-status-text" style="margin-right: 8px;">
         <span class="status-dot"></span>
-        <span id="reboxCountStat">0 Closed Reboxes</span>
+        <span id="reboxCountStat">0 Closed Boxes</span>
       </div>
       <button class="nav-btn" onclick="openIsbnTracerModal()">
         🔍 Trace Any Item
@@ -43,7 +43,7 @@
         📥 Import Sheet / CSV
       </button>
       <button class="nav-btn primary" onclick="openMasterRegistryModal()">
-        📋 Rebox Master Registry
+        📋 Master Box Registry
       </button>
     </div>
   </header>
@@ -52,43 +52,65 @@
   <main class="main-wrapper">
     <div class="grid-container">
 
-      <!-- Column 1: REBOX STATUS & MANAGEMENT -->
+      <!-- Column 1: BOX STATUS & MANAGEMENT -->
       <section class="card-panel">
         <div class="step-header">
           <div class="step-badge">1</div>
           <div class="step-header-text">
-            <h2 class="step-title">REBOX STATUS</h2>
+            <h2 class="step-title">BOX STATUS</h2>
             <p class="step-desc">Active packaging status & sequential ID.</p>
           </div>
         </div>
 
-        <!-- Active Rebox Package Card -->
-        <div id="activeReboxCard" class="rebox-package-card">
-          <div class="rebox-package-tag">
-            <span>📦</span> ACTIVE REBOX PACKAGE
+        <!-- Active Box Package Card -->
+        <div id="activeReboxCard" class="box-package-card">
+          <div class="box-package-tag">
+            <span>📦</span> ACTIVE BOX PACKAGE
           </div>
-          <div id="activeReboxTitle" class="rebox-package-name">NOT ASSIGNED</div>
-          <p id="activeReboxSub" class="rebox-package-desc">Books scanned will be grouped into this box.</p>
+          <div id="activeReboxTitle" class="box-package-name">NOT ASSIGNED</div>
+          <p id="activeReboxSub" class="box-package-desc">Books scanned will be grouped into this box.</p>
         </div>
 
-        <!-- Next Rebox Indicator Card -->
+        <!-- Next Box Indicator Card -->
         <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 6px;">
-          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">NEXT SEQUENTIAL REBOX</div>
-          <div id="nextReboxPreview" style="font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--primary);">RB-0001</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">NEXT SEQUENTIAL BOX</div>
+          <div id="nextReboxPreview" style="font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--primary);">BOX-0001</div>
           <div style="font-size: 11px; color: var(--text-sub);">Assigned automatically when closing the box.</div>
         </div>
 
-        <!-- Search & Inspect RB Box -->
+        <!-- Search & Inspect Box with Searchable Dropdown -->
         <div class="search-rb-section">
           <div class="search-rb-header">
             <div class="search-rb-title">
-              <span>🔎</span> LOOKUP & INSPECT REBOX
+              <span>🔍</span> LOOKUP & INSPECT BOX
             </div>
             <span class="audit-badge">Lookup</span>
           </div>
-          <input type="text" id="searchRbInput" class="form-input" placeholder="Type RB box (e.g. RB-0001)..." onkeyup="handleRbSearchInput(event)">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <select 
+              id="boxSelectDropdown" 
+              class="form-select" 
+              onchange="handleDropdownSelect(this.value)"
+              title="Select a closed box from the dropdown"
+            >
+              <option value="">-- Choose from Closed Boxes --</option>
+            </select>
+            <input 
+              type="text" 
+              id="searchRbInput" 
+              class="form-input" 
+              placeholder="Or search box # (e.g. BOX-0001)..." 
+              list="boxDatalistOptions" 
+              autocomplete="off"
+              onkeyup="handleRbSearchInput(event)" 
+              onchange="handleBoxSelect(this.value)"
+            >
+            <datalist id="boxDatalistOptions">
+              <!-- Dynamically populated with all recorded boxes -->
+            </datalist>
+          </div>
           <button class="btn-inspect" onclick="inspectSearchedRbBox()">
-            📑 Inspect RB Box Contents
+            📑 Inspect Box Contents
           </button>
         </div>
       </section>
@@ -159,8 +181,8 @@
           📦 Assign Box No. & Close
         </button>
 
-        <!-- Start Next Box Button -->
-        <button id="btnStartNextBox" class="btn-action-blue" onclick="startNextBox()">
+        <!-- Start Next Box Button (Disabled until current box is closed) -->
+        <button id="btnStartNextBox" class="btn-action-blue" onclick="startNextBox()" disabled title="Assign and close current box first before starting next box">
           ➔ Start Next Box
         </button>
 
@@ -206,15 +228,15 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>📦</span> <span id="inspectModalTitle">Rebox Details</span>
+          <span>📦</span> <span id="inspectModalTitle">Box Details</span>
         </h3>
         <button class="modal-close" onclick="closeModal('inspectModal')">✕</button>
       </div>
       <div class="modal-body">
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
           <div>
-            <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">REBOX NO.</div>
-            <div id="inspectBoxNumber" style="font-size: 16px; font-weight:800; font-family:var(--font-mono); color:#4f46e5;">RB-0001</div>
+            <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">BOX NO.</div>
+            <div id="inspectBoxNumber" style="font-size: 16px; font-weight:800; font-family:var(--font-mono); color:#4f46e5;">BOX-0001</div>
           </div>
           <div>
             <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL BOOKS</div>
@@ -231,7 +253,7 @@
         </div>
 
         <div style="font-size: 12px; font-weight:700; color:#334155; margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
-          <span>BOOKS IN THIS REBOX:</span>
+          <span>BOOKS IN THIS BOX:</span>
           <span id="inspectAssignedAt" style="font-size: 11px; font-weight:500; color:#94a3b8;">Closed on Oct 22, 2026</span>
         </div>
 
@@ -241,7 +263,7 @@
       </div>
       <div class="modal-footer">
         <button class="nav-btn" onclick="exportBoxCsv()">
-          📥 Export CSV
+          📥 Export Box Manifest (CSV)
         </button>
         <button class="nav-btn primary" onclick="printBoxLabel()">
           🖨️ Print Box Label
@@ -255,13 +277,13 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>🔍</span> Manager Item Tracer (ISBN / Title)
+          <span>🔍</span> Manager Item Tracer (Find Box)
         </h3>
         <button class="modal-close" onclick="closeModal('tracerModal')">✕</button>
       </div>
       <div class="modal-body">
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
-          Instantly trace any Not Found book by ISBN barcode or Book Title to discover its assigned Rebox number and closure timestamp.
+          Instantly trace any Not Found book by ISBN barcode or Book Title to discover its assigned Box number and closure timestamp.
         </p>
         <input 
           type="text" 
@@ -276,8 +298,8 @@
           <!-- Result Card -->
           <div style="background: #f8fafc; border: 1.5px solid #c7d2fe; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 11px; font-weight: 700; color: #4338ca; text-transform: uppercase;">FOUND IN ASSIGNED REBOX</span>
-              <span id="tracerResultBadge" style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: #4f46e5; background: #ffffff; padding: 4px 10px; border-radius: 6px; border: 1px solid #c7d2fe;">RB-0001</span>
+              <span style="font-size: 11px; font-weight: 700; color: #4338ca; text-transform: uppercase;">FOUND IN ASSIGNED BOX</span>
+              <span id="tracerResultBadge" style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: #4f46e5; background: #ffffff; padding: 4px 10px; border-radius: 6px; border: 1px solid #c7d2fe;">BOX-0001</span>
             </div>
             <div id="tracerMatchedItemDesc" style="font-size: 13px; font-weight: 600; color: #1e293b; background: #ffffff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;"></div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 4px;">
@@ -292,12 +314,12 @@
             </div>
           </div>
           <button id="tracerBtnViewBox" class="btn-inspect" style="height: 42px; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;">
-            📦 Open Full Manifest for this Rebox
+            📦 Open Full Manifest for this Box
           </button>
         </div>
 
         <div id="tracerEmptyState" style="text-align: center; padding: 24px 0; color: #94a3b8; font-size: 13px;">
-          Type an ISBN or Book Title above to search across all historical Rebox manifests.
+          Type an ISBN or Book Title above to search across all historical Box manifests.
         </div>
       </div>
     </div>
@@ -308,13 +330,13 @@
     <div class="modal-card" style="max-width: 820px;">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>📋</span> Master Rebox Registry
+          <span>📋</span> Master Box Registry
         </h3>
         <button class="modal-close" onclick="closeModal('registryModal')">✕</button>
       </div>
       <div class="modal-body">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <input type="text" id="registryFilterInput" class="form-input" placeholder="Search Rebox # or ISBN..." style="max-width: 320px;" oninput="renderMasterRegistry()">
+          <input type="text" id="registryFilterInput" class="form-input" placeholder="Search Box #, Operator, or ISBN..." style="max-width: 320px;" oninput="renderMasterRegistry()">
           <span id="registryTotalCount" style="font-size: 12px; font-weight:600; color:#64748b;">0 Boxes Recorded</span>
         </div>
 
@@ -322,7 +344,7 @@
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
             <thead>
               <tr style="background: #f8fafc; border-bottom: 1px solid var(--border-color); color: #475569; font-size: 11px; text-transform: uppercase;">
-                <th style="padding: 10px 14px;">Rebox No.</th>
+                <th style="padding: 10px 14px;">Box No.</th>
                 <th style="padding: 10px 14px;">Books Scanned</th>
                 <th style="padding: 10px 14px;">Date Sealed</th>
                 <th style="padding: 10px 14px;">Operator</th>
@@ -337,7 +359,7 @@
       </div>
       <div class="modal-footer">
         <button class="nav-btn" onclick="exportAllRegistryCsv()">
-          📥 Export All Reboxes (CSV)
+          📥 Export All Boxes (CSV)
         </button>
         <button class="nav-btn primary" onclick="closeModal('registryModal')">
           Done
@@ -375,7 +397,7 @@
     <div class="modal-card" style="max-width: 680px;">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>📥</span> Import Existing Sheet / Rebox List
+          <span>📥</span> Import Existing Sheet / Box List
         </h3>
         <button class="modal-close" onclick="closeModal('importModal')">✕</button>
       </div>
@@ -446,7 +468,7 @@
             <div style="display: flex; flex-direction: column; gap: 6px;">
               <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-main); cursor: pointer;">
                 <input type="radio" id="importOptionRegistry" name="importTargetOption" value="registry" checked>
-                <span>Import and Seal as Closed Reboxes in Master Registry (Auto-assigns RB-xxxx)</span>
+                <span>Import and Seal as Closed Boxes in Master Registry (Auto-assigns BOX-xxxx)</span>
               </label>
               <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-main); cursor: pointer;">
                 <input type="radio" id="importOptionActive" name="importTargetOption" value="active">
@@ -482,7 +504,7 @@
         </div>
 
         <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0;">
-          Connecting to Supabase enables <strong>instant atomic Rebox number assignment</strong> (e.g. User 5 finishes 1st &rarr; gets <code>RB-0001</code>; User 7 finishes 2nd &rarr; gets <code>RB-0002</code>) and live synchronization across all 10 warehouse operators.
+          Connecting to Supabase enables <strong>instant atomic Box number assignment</strong> (e.g. User 5 finishes 1st &rarr; gets <code>BOX-0001</code>; User 7 finishes 2nd &rarr; gets <code>BOX-0002</code>) and live synchronization across all 10 warehouse operators.
         </p>
 
         <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 11px; color: #334155; line-height: 1.6; display: flex; flex-direction: column; gap: 8px;">
@@ -529,8 +551,8 @@
   <!-- Hidden Print Container -->
   <div id="printLabelContainer" style="display:none; font-family: sans-serif; padding: 20px; text-align: center;">
     <div style="border: 3px solid #000; padding: 24px; border-radius: 8px; max-width: 400px; margin: 0 auto;">
-      <div style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">NOT FOUND · REBOX TERMINAL</div>
-      <div id="printRbNumber" style="font-size: 42px; font-weight: 900; font-family: monospace; margin: 16px 0;">RB-0001</div>
+      <div style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">NOT FOUND · BOX TERMINAL</div>
+      <div id="printRbNumber" style="font-size: 42px; font-weight: 900; font-family: monospace; margin: 16px 0;">BOX-0001</div>
       <div id="printDetails" style="font-size: 14px; font-weight: 600; line-height: 1.6;">
         TOTAL BOOKS: 0<br>
         DATE: 2026-10-22<br>
