@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>iBookTrack — Not Found Rebox Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #f8fafc;
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #6366f1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-sub: #475569;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --success: #10b981;
+      --success-hover: #059669;
+      --success-light: #ecfdf5;
+      --amber: #f59e0b;
+      --amber-light: #fffbeb;
+      --danger: #ef4444;
+      --danger-light: #fef2f2;
+      --badge-purple: #f3e8ff;
+      --badge-purple-text: #7e22ce;
+      --radius-xl: 16px;
+      --radius-lg: 12px;
+      --radius-md: 8px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Navigation */
+    .navbar {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      background: #eef2ff;
+      color: #4338ca;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 1px solid #c7d2fe;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .nav-btn:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    .nav-btn.primary {
+      background: #4f46e5;
+      color: #ffffff;
+      border-color: #4f46e5;
+    }
+
+    .nav-btn.primary:hover {
+      background: #4338ca;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Main Container */
+    .main-wrapper {
+      max-width: 1540px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* 3-Column Grid */
+    .grid-container {
+      display: grid;
+      grid-template-columns: 320px 390px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 1200px) {
+      .grid-container {
+        grid-template-columns: 300px 360px 1fr;
+        gap: 16px;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card Panels */
+    .card-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-sm);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    /* Step Header */
+    .step-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 14px;
+    }
+
+    .step-badge {
+      width: 28px;
+      height: 28px;
+      background: #4f46e5;
+      color: #ffffff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 5px rgba(79, 70, 229, 0.3);
+    }
+
+    .step-header-text {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #1e1b4b;
+      margin-bottom: 2px;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* Forms & Controls */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-sub);
+    }
+
+    .badge-required {
+      font-size: 10px;
+      font-weight: 600;
+      background: #fdf2f8;
+      color: #be185d;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #fbcfe8;
+    }
+
+    .form-select, .form-input {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 0 12px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--text-main);
+      background-color: #ffffff;
+      transition: all 0.15s ease;
+    }
+
+    .form-select:focus, .form-input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    /* Active Rebox Package Card */
+    .rebox-package-card {
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      border: 1.5px dashed #cbd5e1;
+      border-radius: var(--radius-lg);
+      padding: 20px 16px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .rebox-package-card.assigned {
+      background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+      border: 1.5px solid #10b981;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+    }
+
+    .rebox-package-tag {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #d97706;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .rebox-package-card.assigned .rebox-package-tag {
+      color: #047857;
+    }
+
+    .rebox-package-name {
+      font-size: 24px;
+      font-weight: 800;
+      color: #334155;
+      letter-spacing: 0.5px;
+      margin: 2px 0;
+      font-family: var(--font-mono);
+    }
+
+    .rebox-package-card.assigned .rebox-package-name {
+      color: #065f46;
+      font-size: 26px;
+    }
+
+    .rebox-package-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Search RB Box In Lot Section */
+    .search-rb-section {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .search-rb-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .search-rb-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .audit-badge {
+      font-size: 10px;
+      font-weight: 700;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .btn-inspect {
+      width: 100%;
+      height: 38px;
+      background: #f8fafc;
+      color: var(--text-sub);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-inspect:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+
+    .btn-return {
+      width: 100%;
+      height: 40px;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      margin-top: auto;
+    }
+
+    .btn-return:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    /* Column 2: Barcode Scanner Terminal */
+    .scanner-input-container {
+      position: relative;
+      margin-top: 4px;
+    }
+
+    .scanner-input {
+      width: 100%;
+      height: 58px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      padding: 0 16px;
+      border: 2px solid #cbd5e1;
+      border-radius: var(--radius-lg);
+      background: #ffffff;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .scanner-input:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), 0 4px 12px rgba(99, 102, 241, 0.1);
+    }
+
+    .scanner-input::placeholder {
+      font-family: var(--font-sans);
+      color: #94a3b8;
+      font-weight: 500;
+      font-size: 15px;
+    }
+
+    .scanner-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      padding: 0 4px;
+    }
+
+    .scanner-status-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    .key-badge {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: #475569;
+    }
+
+    .btn-camera {
+      width: 100%;
+      height: 40px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: var(--radius-md);
+      color: #475569;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-camera:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+      color: var(--text-main);
+    }
+
+    /* Counter Card */
+    .counter-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+
+    .counter-label-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .counter-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+    }
+
+    .counter-sub {
+      font-size: 12px;
+      font-weight: 600;
+      color: #4338ca;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .counter-number-group {
+      text-align: right;
+    }
+
+    .counter-number {
+      font-size: 38px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1;
+      font-family: var(--font-mono);
+    }
+
+    .counter-unit {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Action Buttons */
+    .btn-action-green {
+      width: 100%;
+      height: 48px;
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-lg);
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-action-green:hover:not(:disabled) {
+      background: #059669;
+      transform: translateY(-1px);
+      box-shadow: 0 5px 12px rgba(16, 185, 129, 0.45);
+    }
+
+    .btn-action-green:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+      box-shadow: none;
+      opacity: 0.7;
+    }
+
+    .btn-action-blue {
+      width: 100%;
+      height: 48px;
+      background: #4f46e5;
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-lg);
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(79, 70, 229, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-action-blue:hover {
+      background: #4338ca;
+      transform: translateY(-1px);
+      box-shadow: 0 5px 12px rgba(79, 70, 229, 0.45);
+    }
+
+    .tip-box {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.4;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    /* Column 3: Box Contents Feed */
+    .feed-panel {
+      min-height: 520px;
+      max-height: 720px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .feed-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .feed-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-count {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      background: #f1f5f9;
+      color: #334155;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .badge-sort {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      background: #ffffff;
+      color: #4f46e5;
+      border-radius: 6px;
+      border: 1px solid #c7d2fe;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s ease;
+    }
+
+    .badge-sort:hover {
+      background: #eef2ff;
+    }
+
+    .feed-list {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 4px;
+    }
+
+    /* Custom Scrollbar */
+    .feed-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .feed-list::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+    .feed-list::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .feed-list::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Empty Feed State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 380px;
+      text-align: center;
+      padding: 32px 16px;
+      gap: 12px;
+    }
+
+    .empty-icon {
+      width: 72px;
+      height: 72px;
+      background: #f1f5f9;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .empty-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      max-width: 280px;
+      line-height: 1.45;
+    }
+
+    /* Book Scanned Item */
+    .book-item {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.15s ease;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .book-item:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .book-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .book-index {
+      width: 26px;
+      height: 26px;
+      background: #f1f5f9;
+      color: #475569;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+    }
+
+    .book-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .book-isbn {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: 0.3px;
+    }
+
+    .book-title {
+      font-size: 12px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 320px;
+    }
+
+    .book-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .book-time {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: #94a3b8;
+    }
+
+    .flag-select {
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px 6px;
+      background: #f8fafc;
+      color: #475569;
+      cursor: pointer;
+    }
+
+    .btn-delete-book {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .btn-delete-book:hover {
+      color: #ef4444;
+      background: #fee2e2;
+    }
+
+    /* Modal / Drawer Overlays */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      max-width: 680px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalPop {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      line-height: 1;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .modal-close:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-color);
+      background: #f8fafc;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Print Label Format */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printLabelContainer, #printLabelContainer * {
+        visibility: visible;
+      }
+      #printLabelContainer {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: block !important;
+      }
+    }
+
+    /* Toast notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: #1e1b4b;
+      color: #ffffff;
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+      pointer-events: auto;
+      animation: slideUp 0.25s ease-out;
+      border-left: 4px solid #10b981;
+    }
+
+    .toast.error {
+      border-left-color: #ef4444;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="brand-container">
+      <div class="brand-logo">B</div>
+      <div>
+        <div class="brand-title">
+          iBookTrack
+          <span class="brand-badge">Not Found Rebox Tool</span>
+        </div>
+        <div class="brand-subtitle">Specialized intake & physical box aggregation for uncataloged / not found books</div>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="scanner-status-text" style="margin-right: 8px;">
+        <span class="status-dot"></span>
+        <span id="reboxCountStat">0 Closed Reboxes</span>
+      </div>
+      <button class="nav-btn" onclick="openIsbnTracerModal()">
+        🔍 Trace Any ISBN
+      </button>
+      <button class="nav-btn" onclick="openMasterRegistryModal()">
+        📋 Rebox Master Registry
+      </button>
+      <a href="http://localhost:3000/dashboard" class="nav-btn primary">
+        ← iBookTrack Dashboard
+      </a>
+    </div>
+  </header>
+
+  <!-- Main 3-Column Interface -->
+  <main class="main-wrapper">
+    <div class="grid-container">
+
+      <!-- Column 1: SETUP & LOT PIPELINE -->
+      <section class="card-panel">
+        <div class="step-header">
+          <div class="step-badge">1</div>
+          <div class="step-header-text">
+            <h2 class="step-title">SETUP & LOT PIPELINE</h2>
+            <p class="step-desc">Select active project and lot to load books.</p>
+          </div>
+        </div>
+
+        <!-- Project Selector -->
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label" for="projectSelect">PROJECT</label>
+            <span class="badge-required">required</span>
+          </div>
+          <select id="projectSelect" class="form-select" onchange="handleProjectChange()">
+            <option value="">Select Project</option>
+            <option value="Mustang">Mustang (MDE Collection)</option>
+            <option value="Jaguar">Jaguar (US Collection)</option>
+            <option value="Journal">Journal (Publications)</option>
+          </select>
+        </div>
+
+        <!-- Lot Number Selector -->
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label" for="lotSelect">LOT NUMBER</label>
+            <span class="badge-required">required</span>
+          </div>
+          <select id="lotSelect" class="form-select" onchange="handleLotChange()">
+            <option value="">Select Lot...</option>
+            <option value="Lot-150">Lot-150 (Active Master Lot)</option>
+            <option value="Lot-116">Lot-116 (Mustang Batch)</option>
+            <option value="Lot-113">Lot-113 (Jaguar Batch)</option>
+            <option value="Lot-01">Lot-01 (General)</option>
+            <option value="Lot-02J">Lot-02J (Jaguar Specialty)</option>
+            <option value="custom">+ Type Custom Lot...</option>
+          </select>
+          <input type="text" id="customLotInput" class="form-input" placeholder="Type custom lot name..." style="display: none; margin-top: 6px;" oninput="handleCustomLotInput()">
+        </div>
+
+        <!-- Active Rebox Package Card -->
+        <div id="activeReboxCard" class="rebox-package-card">
+          <div class="rebox-package-tag">
+            <span>📦</span> ACTIVE REBOX PACKAGE
+          </div>
+          <div id="activeReboxTitle" class="rebox-package-name">NOT ASSIGNED</div>
+          <p id="activeReboxSub" class="rebox-package-desc">Books scanned will be grouped into this box.</p>
+        </div>
+
+        <!-- Search RB Boxes In Lot Section -->
+        <div class="search-rb-section">
+          <div class="search-rb-header">
+            <div class="search-rb-title">
+              <span>🔎</span> SEARCH RB BOXES IN LOT
+            </div>
+            <span class="audit-badge">Audit</span>
+          </div>
+          <input type="text" id="searchRbInput" class="form-input" placeholder="Type RB box (e.g. RB-0001)..." onkeyup="handleRbSearchInput(event)">
+          <select id="searchLotFilter" class="form-select">
+            <option value="">All Lots in Project</option>
+          </select>
+          <button class="btn-inspect" onclick="inspectSearchedRbBox()">
+            📑 Inspect RB Box Contents
+          </button>
+        </div>
+
+        <!-- Return to Dashboard -->
+        <a href="http://localhost:3000/dashboard" class="btn-return">
+          ← Return to Dashboard
+        </a>
+      </section>
+
+      <!-- Column 2: BARCODE SCANNER TERMINAL -->
+      <section class="card-panel">
+        <div class="step-header">
+          <div class="step-badge">2</div>
+          <div class="step-header-text">
+            <h2 class="step-title">BARCODE SCANNER TERMINAL</h2>
+            <p class="step-desc">Scan physical books to place into current box package.</p>
+          </div>
+        </div>
+
+        <!-- Scanner Input -->
+        <div class="scanner-input-container">
+          <input 
+            type="text" 
+            id="barcodeScannerInput" 
+            class="scanner-input" 
+            placeholder="Scan or type ISBN..." 
+            autocomplete="off" 
+            autofocus
+            onkeydown="handleBarcodeKeyDown(event)"
+          >
+          <div class="scanner-status-row">
+            <span class="scanner-status-text">
+              <span class="status-dot" style="background:#6366f1;"></span>
+              Physical Barcode Reader Ready
+            </span>
+            <span class="key-badge">Press Enter</span>
+          </div>
+        </div>
+
+        <!-- Mobile Camera Button -->
+        <button class="btn-camera" onclick="openCameraScanner()">
+          📷 Scan with Mobile Camera
+        </button>
+
+        <!-- Current Box Scans Counter Card -->
+        <div class="counter-card">
+          <div class="counter-label-group">
+            <span class="counter-label">CURRENT BOX SCANS</span>
+            <span id="boxScanStatus" class="counter-sub">
+              <span class="status-dot" style="background:#6366f1;"></span>
+              Pending Assignment
+            </span>
+          </div>
+          <div class="counter-number-group">
+            <div id="currentBoxCount" class="counter-number">0</div>
+            <div class="counter-unit">BOOKS</div>
+          </div>
+        </div>
+
+        <!-- Assign Box No. & Close Button -->
+        <button id="btnAssignBox" class="btn-action-green" onclick="assignBoxAndClose()" disabled>
+          📦 Assign Box No. & Close
+        </button>
+
+        <!-- Start Next Box Button -->
+        <button id="btnStartNextBox" class="btn-action-blue" onclick="startNextBox()">
+          ➔ Start Next Box
+        </button>
+
+        <div class="tip-box">
+          <span>💡</span>
+          <span>Tip: Click Flag Issue in the feed to mark damaged, brittle, or mismatch books.</span>
+        </div>
+      </section>
+
+      <!-- Column 3: BOX CONTENTS FEED -->
+      <section class="card-panel feed-panel">
+        <div class="step-header" style="border-bottom: none; padding-bottom: 0;">
+          <div class="step-badge">3</div>
+          <div class="step-header-text">
+            <div class="feed-header-top">
+              <h2 class="step-title">BOX CONTENTS FEED</h2>
+              <div class="feed-badges">
+                <span id="feedCountBadge" class="badge-count">Total: 0</span>
+                <button class="badge-sort" onclick="toggleSortOrder()">
+                  <span id="sortOrderLabel">Newest First</span> ▾
+                </button>
+              </div>
+            </div>
+            <p class="step-desc">Audit log of books currently scanned into this active package.</p>
+          </div>
+        </div>
+
+        <!-- Book Scans List / Empty State -->
+        <div id="feedList" class="feed-list">
+          <div id="emptyFeedState" class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3 class="empty-title">No Books Scanned Yet</h3>
+            <p class="empty-desc">Select your project and lot on the left to activate the barcode scanner.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Modal: Inspect RB Box Contents -->
+  <div id="inspectModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>📦</span> <span id="inspectModalTitle">Rebox Details</span>
+        </h3>
+        <button class="modal-close" onclick="closeModal('inspectModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <div>
+            <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">REBOX NO.</div>
+            <div id="inspectBoxNumber" style="font-size: 16px; font-weight:800; font-family:var(--font-mono); color:#4f46e5;">RB-0001</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">PROJECT</div>
+            <div id="inspectProject" style="font-size: 14px; font-weight:700; color:#0f172a;">Mustang</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">LOT NO.</div>
+            <div id="inspectLot" style="font-size: 14px; font-weight:700; color:#0f172a;">Lot-150</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL BOOKS</div>
+            <div id="inspectBookCount" style="font-size: 16px; font-weight:800; font-family:var(--font-mono); color:#10b981;">0</div>
+          </div>
+        </div>
+
+        <div style="font-size: 12px; font-weight:700; color:#334155; margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
+          <span>BOOKS IN THIS REBOX:</span>
+          <span id="inspectAssignedAt" style="font-size: 11px; font-weight:500; color:#94a3b8;">Closed on Oct 22, 2026</span>
+        </div>
+
+        <div id="inspectBooksList" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; padding-right:4px;">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="nav-btn" onclick="exportBoxCsv()">
+          📥 Export CSV
+        </button>
+        <button class="nav-btn primary" onclick="printBoxLabel()">
+          🖨️ Print Box Label
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Manager ISBN Tracer -->
+  <div id="tracerModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>🔍</span> Manager ISBN Tracer
+        </h3>
+        <button class="modal-close" onclick="closeModal('tracerModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+          Instantly trace any Not Found ISBN to discover its assigned Rebox number, lot, project, and closure timestamp.
+        </p>
+        <input 
+          type="text" 
+          id="tracerSearchInput" 
+          class="form-input" 
+          placeholder="Type or scan ISBN to trace..." 
+          style="height: 48px; font-size: 15px; font-family: var(--font-mono);"
+          oninput="traceIsbn(this.value)"
+        >
+
+        <div id="tracerResultsContainer" style="display: none; flex-direction: column; gap: 12px; margin-top: 8px;">
+          <!-- Result Card -->
+          <div style="background: #f8fafc; border: 1.5px solid #c7d2fe; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; font-weight: 700; color: #4338ca; text-transform: uppercase;">FOUND IN ASSIGNED REBOX</span>
+              <span id="tracerResultBadge" style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: #4f46e5; background: #ffffff; padding: 4px 10px; border-radius: 6px; border: 1px solid #c7d2fe;">RB-0001</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;">
+              <div>
+                <div style="font-size: 10px; color:#64748b; font-weight:600;">PROJECT</div>
+                <div id="tracerProject" style="font-size: 13px; font-weight:700; color:#0f172a;">Mustang</div>
+              </div>
+              <div>
+                <div style="font-size: 10px; color:#64748b; font-weight:600;">LOT</div>
+                <div id="tracerLot" style="font-size: 13px; font-weight:700; color:#0f172a;">Lot-150</div>
+              </div>
+              <div>
+                <div style="font-size: 10px; color:#64748b; font-weight:600;">ASSIGNED DATE</div>
+                <div id="tracerDate" style="font-size: 12px; font-weight:600; color:#0f172a;">Oct 22, 2026</div>
+              </div>
+            </div>
+          </div>
+          <button id="tracerBtnViewBox" class="btn-inspect" style="height: 42px; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;">
+            📦 Open Full Manifest for this Rebox
+          </button>
+        </div>
+
+        <div id="tracerEmptyState" style="text-align: center; padding: 24px 0; color: #94a3b8; font-size: 13px;">
+          Type an ISBN above to search across all historical Rebox manifests.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Master Registry -->
+  <div id="registryModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 820px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>📋</span> Master Rebox Registry
+        </h3>
+        <button class="modal-close" onclick="closeModal('registryModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <input type="text" id="registryFilterInput" class="form-input" placeholder="Search Rebox #, Project, or Lot..." style="max-width: 320px;" oninput="renderMasterRegistry()">
+          <span id="registryTotalCount" style="font-size: 12px; font-weight:600; color:#64748b;">0 Boxes Recorded</span>
+        </div>
+
+        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; max-height: 400px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 1px solid var(--border-color); color: #475569; font-size: 11px; text-transform: uppercase;">
+                <th style="padding: 10px 14px;">Rebox No.</th>
+                <th style="padding: 10px 14px;">Project</th>
+                <th style="padding: 10px 14px;">Lot Number</th>
+                <th style="padding: 10px 14px;">Books</th>
+                <th style="padding: 10px 14px;">Date Closed</th>
+                <th style="padding: 10px 14px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="registryTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="nav-btn" onclick="exportAllRegistryCsv()">
+          📥 Export All Reboxes (CSV)
+        </button>
+        <button class="nav-btn primary" onclick="closeModal('registryModal')">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera Scanner Modal -->
+  <div id="cameraModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>📷</span> Mobile / Camera Barcode Scanner
+        </h3>
+        <button class="modal-close" onclick="closeCameraScanner()">✕</button>
+      </div>
+      <div class="modal-body" style="align-items: center;">
+        <div style="position: relative; width: 100%; height: 280px; background: #000000; border-radius: 12px; overflow: hidden;">
+          <video id="cameraVideo" style="width: 100%; height: 100%; object-fit: cover;"></video>
+          <div style="position: absolute; inset: 20%; border: 2px dashed #10b981; border-radius: 8px; pointer-events: none;"></div>
+        </div>
+        <p id="cameraStatusText" style="font-size: 12px; color: var(--text-muted); text-align: center;">
+          Aim your camera at the book barcode.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="nav-btn" onclick="closeCameraScanner()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Print Container -->
+  <div id="printLabelContainer" style="display:none; font-family: sans-serif; padding: 20px; text-align: center;">
+    <div style="border: 3px solid #000; padding: 24px; border-radius: 8px; max-width: 400px; margin: 0 auto;">
+      <div style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">iBOOKTRACK · NOT FOUND REBOX</div>
+      <div id="printRbNumber" style="font-size: 42px; font-weight: 900; font-family: monospace; margin: 16px 0;">RB-0001</div>
+      <div id="printDetails" style="font-size: 14px; font-weight: 600; line-height: 1.6;">
+        PROJECT: MUSTANG<br>
+        LOT: LOT-150<br>
+        TOTAL BOOKS: 15<br>
+        DATE: 2026-10-22
+      </div>
+      <div style="margin-top: 16px; font-size: 11px; color: #555;">INBOUND VERIFICATION & AUDIT MANIFEST</div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Script Logic -->
+  <script>
+    // Storage keys
+    const STORAGE_KEY_REGISTRY = 'ibooktrack_not_found_reboxes';
+    const STORAGE_KEY_COUNTER = 'ibooktrack_not_found_rb_counter';
+    const STORAGE_KEY_ACTIVE = 'ibooktrack_not_found_active_session';
+
+    // State
+    let currentScannedBooks = [];
+    let currentAssignedRebox = null; // null if pending, string e.g. "RB-0001" if closed
+    let sortOrder = 'newest'; // 'newest' | 'oldest'
+    let cameraStream = null;
+    let cameraInterval = null;
+
+    // Load state on startup
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedActiveSession();
+      updateCounterDisplay();
+      updateReboxCountStat();
+      document.getElementById('barcodeScannerInput').focus();
+    });
+
+    // ── Audio Feedback (Synthesized via Web Audio API) ──────────────────
+    let audioCtx = null;
+    function playBeep(type = 'success') {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'success') {
+          osc.frequency.setValueAtTime(1760, audioCtx.currentTime); // High pitch POS beep
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.08);
+        } else if (type === 'box_closed') {
+          // Double pleasant chime
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(1760, audioCtx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.28);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.28);
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.22);
+        }
+      } catch (e) {
+        // Audio optional
+      }
+    }
+
+    // ── Toast Notifications ─────────────────────────────────────────────
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+      toast.innerHTML = `<span>${type === 'error' ? '⚠️' : '✅'}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'all 0.25s ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+
+    // ── Local Storage & Persistence Helpers ─────────────────────────────
+    function getStoredRegistry() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_REGISTRY);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveRegistry(list) {
+      localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(list));
+      updateReboxCountStat();
+    }
+
+    function getNextIncrementalRbNumber() {
+      const registry = getStoredRegistry();
+      let maxNum = 0;
+      registry.forEach(r => {
+        const match = (r.rebox_number || '').match(/\d+/);
+        if (match) {
+          const num = parseInt(match[0], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      });
+      const storedCounter = parseInt(localStorage.getItem(STORAGE_KEY_COUNTER) || '0', 10);
+      const nextNum = Math.max(maxNum, storedCounter) + 1;
+      localStorage.setItem(STORAGE_KEY_COUNTER, String(nextNum));
+      return `RB-${String(nextNum).padStart(4, '0')}`;
+    }
+
+    function saveActiveSession() {
+      const session = {
+        project: document.getElementById('projectSelect').value,
+        lot: getSelectedLot(),
+        books: currentScannedBooks,
+        assignedRebox: currentAssignedRebox,
+      };
+      localStorage.setItem(STORAGE_KEY_ACTIVE, JSON.stringify(session));
+    }
+
+    function loadSavedActiveSession() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_ACTIVE);
+        if (!raw) return;
+        const session = JSON.parse(raw);
+        if (session.project) document.getElementById('projectSelect').value = session.project;
+        if (session.lot) {
+          const select = document.getElementById('lotSelect');
+          let matched = false;
+          for (let opt of select.options) {
+            if (opt.value === session.lot) {
+              select.value = session.lot;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            select.value = 'custom';
+            const customInput = document.getElementById('customLotInput');
+            customInput.style.display = 'block';
+            customInput.value = session.lot;
+          }
+        }
+        if (Array.isArray(session.books)) {
+          currentScannedBooks = session.books;
+        }
+        if (session.assignedRebox) {
+          currentAssignedRebox = session.assignedRebox;
+        }
+        updateUiState();
+      } catch (e) {
+        console.error('Error loading saved session:', e);
+      }
+    }
+
+    function getSelectedLot() {
+      const select = document.getElementById('lotSelect');
+      if (select.value === 'custom') {
+        return (document.getElementById('customLotInput').value || '').trim() || 'Lot-Custom';
+      }
+      return select.value;
+    }
+
+    // ── Input & Barcode Handling ────────────────────────────────────────
+    function handleProjectChange() {
+      saveActiveSession();
+      populateLotFilterForSearch();
+    }
+
+    function handleLotChange() {
+      const select = document.getElementById('lotSelect');
+      const customInput = document.getElementById('customLotInput');
+      if (select.value === 'custom') {
+        customInput.style.display = 'block';
+        customInput.focus();
+      } else {
+        customInput.style.display = 'none';
+      }
+      saveActiveSession();
+      populateLotFilterForSearch();
+    }
+
+    function handleCustomLotInput() {
+      saveActiveSession();
+      populateLotFilterForSearch();
+    }
+
+    function handleBarcodeKeyDown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const input = document.getElementById('barcodeScannerInput');
+        const rawIsbn = (input.value || '').trim();
+        if (rawIsbn) {
+          processScannedIsbn(rawIsbn);
+          input.value = '';
+        }
+      }
+    }
+
+    function processScannedIsbn(rawIsbn) {
+      // Validate Project & Lot first
+      const project = document.getElementById('projectSelect').value;
+      const lot = getSelectedLot();
+
+      if (!project) {
+        playBeep('error');
+        showToast('Please select a Project first before scanning.', 'error');
+        document.getElementById('projectSelect').focus();
+        return;
+      }
+      if (!lot) {
+        playBeep('error');
+        showToast('Please select or specify a Lot Number first.', 'error');
+        document.getElementById('lotSelect').focus();
+        return;
+      }
+
+      // If active box is already closed, remind user to start next box
+      if (currentAssignedRebox) {
+        playBeep('error');
+        showToast(`Box ${currentAssignedRebox} is already closed. Click "Start Next Box" to begin a new package.`, 'error');
+        return;
+      }
+
+      // Normalize ISBN (digits, X, hyphens)
+      const cleanIsbn = rawIsbn.replace(/[^0-9X-]/gi, '');
+      if (cleanIsbn.length < 6) {
+        playBeep('error');
+        showToast(`Invalid barcode or ISBN length: "${rawIsbn}"`, 'error');
+        return;
+      }
+
+      // Check if already scanned in current package
+      const exists = currentScannedBooks.some(b => b.isbn.replace(/-/g, '') === cleanIsbn.replace(/-/g, ''));
+      if (exists) {
+        playBeep('error');
+        showToast(`ISBN ${cleanIsbn} is ALREADY scanned in this current package!`, 'error');
+        return;
+      }
+
+      // Create new book entry
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+
+      const book = {
+        isbn: cleanIsbn,
+        title: `Not Found / Physical Book (${cleanIsbn})`,
+        scanned_at: timeStr,
+        timestamp: now.toISOString(),
+        flag: 'normal',
+      };
+
+      currentScannedBooks.unshift(book);
+      playBeep('success');
+      showToast(`Scanned ISBN: ${cleanIsbn}`);
+      saveActiveSession();
+      updateUiState();
+    }
+
+    // ── Rebox Assignment & Closure (Core User Functionality) ────────────
+    function assignBoxAndClose() {
+      if (currentScannedBooks.length === 0) {
+        showToast('Cannot close an empty box. Please scan at least 1 book.', 'error');
+        return;
+      }
+      if (currentAssignedRebox) {
+        showToast(`This box is already assigned as ${currentAssignedRebox}.`, 'error');
+        return;
+      }
+
+      const project = document.getElementById('projectSelect').value;
+      const lot = getSelectedLot();
+
+      if (!project || !lot) {
+        showToast('Project and Lot must be selected before closing the box.', 'error');
+        return;
+      }
+
+      // Generate the next incremental Rebox Number
+      const nextRb = getNextIncrementalRbNumber();
+      currentAssignedRebox = nextRb;
+
+      // Save into historical Rebox Registry
+      const registry = getStoredRegistry();
+      const now = new Date();
+
+      const newReboxRecord = {
+        rebox_number: nextRb,
+        project: project,
+        lot_number: lot,
+        assigned_at: now.toISOString(),
+        assigned_at_formatted: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        book_count: currentScannedBooks.length,
+        status: 'Closed',
+        books: [...currentScannedBooks],
+      };
+
+      registry.unshift(newReboxRecord);
+      saveRegistry(registry);
+
+      // Play success chime
+      playBeep('box_closed');
+
+      // Update UI
+      updateUiState();
+      saveActiveSession();
+
+      showToast(`🎉 Box assigned: ${nextRb} (${newReboxRecord.book_count} books). Package is now CLOSED.`);
+    }
+
+    function startNextBox() {
+      // Clear active session
+      currentScannedBooks = [];
+      currentAssignedRebox = null;
+      saveActiveSession();
+      updateUiState();
+
+      document.getElementById('barcodeScannerInput').value = '';
+      document.getElementById('barcodeScannerInput').focus();
+      showToast('Started new Rebox package. Scanner ready for next books.');
+    }
+
+    // ── UI State Synchronizer ───────────────────────────────────────────
+    function updateUiState() {
+      const count = currentScannedBooks.length;
+      document.getElementById('currentBoxCount').textContent = count;
+      document.getElementById('feedCountBadge').textContent = `Total: ${count}`;
+
+      // Update Active Rebox Package Card
+      const packageCard = document.getElementById('activeReboxCard');
+      const packageTitle = document.getElementById('activeReboxTitle');
+      const packageSub = document.getElementById('activeReboxSub');
+      const boxStatus = document.getElementById('boxScanStatus');
+      const btnAssign = document.getElementById('btnAssignBox');
+
+      if (currentAssignedRebox) {
+        packageCard.classList.add('assigned');
+        packageTitle.textContent = currentAssignedRebox;
+        packageSub.textContent = `Assigned & Closed (${count} books sealed)`;
+        boxStatus.innerHTML = `<span class="status-dot" style="background:#10b981;"></span> Sealed: ${currentAssignedRebox}`;
+        btnAssign.disabled = true;
+        btnAssign.textContent = `✓ ${currentAssignedRebox} Closed`;
+      } else {
+        packageCard.classList.remove('assigned');
+        packageTitle.textContent = count > 0 ? `NOT ASSIGNED (${count})` : 'NOT ASSIGNED';
+        packageSub.textContent = 'Books scanned will be grouped into this box.';
+        boxStatus.innerHTML = `<span class="status-dot" style="background:#6366f1;"></span> Pending Assignment`;
+        btnAssign.disabled = count === 0;
+        btnAssign.innerHTML = `📦 Assign Box No. & Close`;
+      }
+
+      renderFeed();
+      populateLotFilterForSearch();
+    }
+
+    function updateCounterDisplay() {
+      document.getElementById('currentBoxCount').textContent = currentScannedBooks.length;
+    }
+
+    function updateReboxCountStat() {
+      const registry = getStoredRegistry();
+      document.getElementById('reboxCountStat').textContent = `${registry.length} Closed Rebox${registry.length === 1 ? '' : 'es'}`;
+    }
+
+    // ── Feed Rendering ──────────────────────────────────────────────────
+    function renderFeed() {
+      const listContainer = document.getElementById('feedList');
+      const emptyState = document.getElementById('emptyFeedState');
+
+      if (currentScannedBooks.length === 0) {
+        listContainer.innerHTML = '';
+        listContainer.appendChild(emptyState);
+        emptyState.style.display = 'flex';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      // Sort items
+      const items = [...currentScannedBooks];
+      if (sortOrder === 'oldest') {
+        items.reverse();
+      }
+
+      let html = '';
+      items.forEach((book, idx) => {
+        const itemIdx = sortOrder === 'newest' ? currentScannedBooks.length - idx : idx + 1;
+        html += `
+          <div class="book-item">
+            <div class="book-left">
+              <span class="book-index">#${itemIdx}</span>
+              <div class="book-details">
+                <span class="book-isbn">${book.isbn}</span>
+                <span class="book-title">${book.title}</span>
+              </div>
+            </div>
+            <div class="book-right">
+              <span class="book-time">${book.scanned_at}</span>
+              <select class="flag-select" onchange="changeBookFlag('${book.isbn}', this.value)" ${currentAssignedRebox ? 'disabled' : ''}>
+                <option value="normal" ${book.flag === 'normal' ? 'selected' : ''}>Normal</option>
+                <option value="brittle" ${book.flag === 'brittle' ? 'selected' : ''}>⚠️ Brittle</option>
+                <option value="torn" ${book.flag === 'torn' ? 'selected' : ''}>⚠️ Torn Pages</option>
+                <option value="stained" ${book.flag === 'stained' ? 'selected' : ''}>⚠️ Stained</option>
+                <option value="mismatch" ${book.flag === 'mismatch' ? 'selected' : ''}>🔄 Mismatch</option>
+              </select>
+              ${!currentAssignedRebox ? `
+                <button class="btn-delete-book" title="Remove ISBN" onclick="removeBook('${book.isbn}')">
+                  🗑️
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      });
+
+      listContainer.innerHTML = html;
+    }
+
+    function toggleSortOrder() {
+      sortOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
+      document.getElementById('sortOrderLabel').textContent = sortOrder === 'newest' ? 'Newest First' : 'Oldest First';
+      renderFeed();
+    }
+
+    function changeBookFlag(isbn, flag) {
+      const b = currentScannedBooks.find(item => item.isbn === isbn);
+      if (b) {
+        b.flag = flag;
+        saveActiveSession();
+      }
+    }
+
+    function removeBook(isbn) {
+      if (currentAssignedRebox) {
+        showToast('Cannot delete from an already closed box.', 'error');
+        return;
+      }
+      currentScannedBooks = currentScannedBooks.filter(b => b.isbn !== isbn);
+      saveActiveSession();
+      updateUiState();
+      showToast(`Removed ISBN ${isbn}`);
+    }
+
+    // ── Search RB Boxes In Lot Section ──────────────────────────────────
+    function populateLotFilterForSearch() {
+      const select = document.getElementById('searchLotFilter');
+      const registry = getStoredRegistry();
+      const currentLot = getSelectedLot();
+
+      const lots = new Set();
+      if (currentLot) lots.add(currentLot);
+      registry.forEach(r => { if (r.lot_number) lots.add(r.lot_number); });
+
+      let html = '<option value="">All Lots in Project</option>';
+      lots.forEach(l => {
+        html += `<option value="${l}" ${l === currentLot ? 'selected' : ''}>${l}</option>`;
+      });
+      select.innerHTML = html;
+    }
+
+    function handleRbSearchInput(e) {
+      if (e.key === 'Enter') {
+        inspectSearchedRbBox();
+      }
+    }
+
+    function inspectSearchedRbBox() {
+      const input = document.getElementById('searchRbInput');
+      const term = (input.value || '').trim().toUpperCase();
+      if (!term) {
+        showToast('Please type an RB box number (e.g. RB-0001).', 'error');
+        input.focus();
+        return;
+      }
+
+      const registry = getStoredRegistry();
+      const matched = registry.find(r => (r.rebox_number || '').toUpperCase() === term || (r.rebox_number || '').replace(/-/g, '').toUpperCase() === term.replace(/-/g, ''));
+
+      if (!matched) {
+        showToast(`No record found for Rebox "${term}".`, 'error');
+        return;
+      }
+
+      openInspectModalForBox(matched);
+    }
+
+    function openInspectModalForBox(boxRecord) {
+      document.getElementById('inspectModalTitle').textContent = `Rebox ${boxRecord.rebox_number} Manifest`;
+      document.getElementById('inspectBoxNumber').textContent = boxRecord.rebox_number;
+      document.getElementById('inspectProject').textContent = boxRecord.project || 'Unknown';
+      document.getElementById('inspectLot').textContent = boxRecord.lot_number || 'Unknown';
+      document.getElementById('inspectBookCount').textContent = boxRecord.book_count || (boxRecord.books || []).length;
+      document.getElementById('inspectAssignedAt').textContent = `Closed on ${boxRecord.assigned_at_formatted || new Date(boxRecord.assigned_at).toLocaleString()}`;
+
+      // Set print details
+      document.getElementById('printRbNumber').textContent = boxRecord.rebox_number;
+      document.getElementById('printDetails').innerHTML = `
+        PROJECT: ${(boxRecord.project || '').toUpperCase()}<br>
+        LOT: ${(boxRecord.lot_number || '').toUpperCase()}<br>
+        TOTAL BOOKS: ${boxRecord.book_count}<br>
+        DATE: ${new Date(boxRecord.assigned_at).toLocaleDateString()}
+      `;
+
+      // Render books
+      const listEl = document.getElementById('inspectBooksList');
+      let html = '';
+      (boxRecord.books || []).forEach((b, idx) => {
+        html += `
+          <div class="book-item" style="padding: 8px 12px;">
+            <div class="book-left">
+              <span class="book-index" style="width:22px; height:22px; font-size:10px;">#${idx + 1}</span>
+              <div class="book-details">
+                <span class="book-isbn" style="font-size:13px;">${b.isbn}</span>
+                <span class="book-title" style="font-size:11px;">${b.title}</span>
+              </div>
+            </div>
+            <div class="book-right">
+              ${b.flag && b.flag !== 'normal' ? `<span style="font-size:10px; font-weight:700; color:#d97706; background:#fef3c7; padding:2px 6px; border-radius:4px;">${b.flag.toUpperCase()}</span>` : ''}
+              <span class="book-time">${b.scanned_at || ''}</span>
+            </div>
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+
+      // Store current inspect record for export
+      window._currentInspectBox = boxRecord;
+
+      openModal('inspectModal');
+    }
+
+    function exportBoxCsv() {
+      const box = window._currentInspectBox;
+      if (!box || !box.books) return;
+
+      let csv = 'Index,ISBN,Title,Scanned_Time,Flag,Rebox_Number,Project,Lot\n';
+      box.books.forEach((b, i) => {
+        csv += `"${i + 1}","${b.isbn}","${b.title.replace(/"/g, '""')}","${b.scanned_at || ''}","${b.flag || 'normal'}","${box.rebox_number}","${box.project}","${box.lot_number}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${box.rebox_number}-manifest.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Exported ${box.rebox_number} CSV.`);
+    }
+
+    function printBoxLabel() {
+      window.print();
+    }
+
+    // ── Manager ISBN Tracer ─────────────────────────────────────────────
+    function openIsbnTracerModal() {
+      openModal('tracerModal');
+      const input = document.getElementById('tracerSearchInput');
+      input.value = '';
+      document.getElementById('tracerResultsContainer').style.display = 'none';
+      document.getElementById('tracerEmptyState').style.display = 'block';
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function traceIsbn(query) {
+      const clean = (query || '').replace(/[^0-9X-]/gi, '').trim().toUpperCase();
+      const container = document.getElementById('tracerResultsContainer');
+      const empty = document.getElementById('tracerEmptyState');
+
+      if (clean.length < 5) {
+        container.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = 'Type an ISBN to search across all historical Rebox manifests.';
+        return;
+      }
+
+      const registry = getStoredRegistry();
+      let matchedBox = null;
+      let matchedBook = null;
+
+      for (let box of registry) {
+        for (let book of (box.books || [])) {
+          if (book.isbn.replace(/-/g, '').toUpperCase().includes(clean.replace(/-/g, ''))) {
+            matchedBox = box;
+            matchedBook = book;
+            break;
+          }
+        }
+        if (matchedBox) break;
+      }
+
+      if (matchedBox) {
+        container.style.display = 'flex';
+        empty.style.display = 'none';
+        document.getElementById('tracerResultBadge').textContent = matchedBox.rebox_number;
+        document.getElementById('tracerProject').textContent = matchedBox.project;
+        document.getElementById('tracerLot').textContent = matchedBox.lot_number;
+        document.getElementById('tracerDate').textContent = matchedBox.assigned_at_formatted || new Date(matchedBox.assigned_at).toLocaleDateString();
+
+        document.getElementById('tracerBtnViewBox').onclick = () => {
+          closeModal('tracerModal');
+          openInspectModalForBox(matchedBox);
+        };
+      } else {
+        container.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = `No Rebox record found for ISBN "${query}".`;
+      }
+    }
+
+    // ── Master Rebox Registry ───────────────────────────────────────────
+    function openMasterRegistryModal() {
+      renderMasterRegistry();
+      openModal('registryModal');
+    }
+
+    function renderMasterRegistry() {
+      const registry = getStoredRegistry();
+      const filter = (document.getElementById('registryFilterInput')?.value || '').trim().toLowerCase();
+      const tbody = document.getElementById('registryTableBody');
+
+      let filtered = registry;
+      if (filter) {
+        filtered = registry.filter(r => 
+          (r.rebox_number || '').toLowerCase().includes(filter) ||
+          (r.project || '').toLowerCase().includes(filter) ||
+          (r.lot_number || '').toLowerCase().includes(filter)
+        );
+      }
+
+      document.getElementById('registryTotalCount').textContent = `${filtered.length} of ${registry.length} Boxes`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">No Rebox packages recorded yet.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach(r => {
+        html += `
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 10px 14px; font-weight:700; font-family:var(--font-mono); color:#4f46e5;">${r.rebox_number}</td>
+            <td style="padding: 10px 14px; font-weight:600;">${r.project || '—'}</td>
+            <td style="padding: 10px 14px;">${r.lot_number || '—'}</td>
+            <td style="padding: 10px 14px; font-family:var(--font-mono); font-weight:600;">${r.book_count || (r.books || []).length}</td>
+            <td style="padding: 10px 14px; font-size:12px; color:#64748b;">${r.assigned_at_formatted || new Date(r.assigned_at).toLocaleDateString()}</td>
+            <td style="padding: 10px 14px; text-align:right;">
+              <button class="nav-btn" style="padding: 4px 8px; font-size:11px;" onclick="viewRegistryBox('${r.rebox_number}')">
+                Inspect ➔
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function viewRegistryBox(rbNumber) {
+      const registry = getStoredRegistry();
+      const box = registry.find(r => r.rebox_number === rbNumber);
+      if (box) {
+        closeModal('registryModal');
+        openInspectModalForBox(box);
+      }
+    }
+
+    function exportAllRegistryCsv() {
+      const registry = getStoredRegistry();
+      if (registry.length === 0) {
+        showToast('No Rebox records to export.', 'error');
+        return;
+      }
+
+      let csv = 'Rebox_Number,Project,Lot_Number,Book_Count,Date_Closed,ISBN_List\n';
+      registry.forEach(r => {
+        const isbns = (r.books || []).map(b => b.isbn).join('; ');
+        csv += `"${r.rebox_number}","${r.project}","${r.lot_number}","${r.book_count}","${r.assigned_at}","${isbns}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `iBookTrack-All-Reboxes-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Exported Master Rebox Registry.');
+    }
+
+    // ── Mobile / Camera Scanner ─────────────────────────────────────────
+    async function openCameraScanner() {
+      openModal('cameraModal');
+      const video = document.getElementById('cameraVideo');
+      const statusText = document.getElementById('cameraStatusText');
+
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        video.srcObject = cameraStream;
+        await video.play();
+
+        // Check if native BarcodeDetector API is available (Chrome / Edge / Android)
+        if ('BarcodeDetector' in window) {
+          const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a'] });
+          cameraInterval = setInterval(async () => {
+            try {
+              const barcodes = await detector.detect(video);
+              if (barcodes.length > 0) {
+                const detectedIsbn = barcodes[0].rawValue;
+                closeCameraScanner();
+                processScannedIsbn(detectedIsbn);
+              }
+            } catch (err) {}
+          }, 300);
+        } else {
+          statusText.textContent = 'Camera active. For automated scanning, use a USB/Bluetooth barcode scanner or Chrome/Edge mobile.';
+        }
+      } catch (err) {
+        statusText.textContent = 'Camera access denied or unavailable.';
+      }
+    }
+
+    function closeCameraScanner() {
+      if (cameraInterval) clearInterval(cameraInterval);
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+      closeModal('cameraModal');
+    }
+
+    // ── Modal Generic Helpers ───────────────────────────────────────────
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+  </script>
+</body>
+</html>
+
