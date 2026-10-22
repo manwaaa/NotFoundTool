@@ -337,13 +337,18 @@
           </table>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="nav-btn" onclick="exportAllRegistryCsv()">
-          📥 Export All Boxes (CSV)
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <button class="nav-btn" style="color: #ef4444; border-color: #fca5a5; background: #fff5f5; font-weight: 700;" onclick="confirmResetAllData()">
+          🗑️ Reset / Fresh Start (Clear All)
         </button>
-        <button class="nav-btn primary" onclick="closeModal('registryModal')">
-          Done
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="nav-btn" onclick="exportAllRegistryCsv()">
+            📥 Export All Boxes (CSV)
+          </button>
+          <button class="nav-btn primary" onclick="closeModal('registryModal')">
+            Done
+          </button>
+        </div>
       </div>
     </div>
   </div>

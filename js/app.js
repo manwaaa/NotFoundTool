@@ -1349,6 +1349,50 @@ function exportAllRegistryCsv() {
   showToast('Exported Master Box Registry.');
 }
 
+async function confirmResetAllData() {
+  const confirmed = confirm(
+    '⚠️ RESET ALL BOX DATA?\n\n' +
+    'This will permanently delete all recorded boxes from Supabase and local storage, restarting the counter at BOX-0001.\n\n' +
+    'Are you sure you want a fresh start?'
+  );
+
+  if (!confirmed) return;
+
+  try {
+    if (isCloudConnected && supabaseClient) {
+      const { error } = await supabaseClient
+        .from('not_found_reboxes')
+        .delete()
+        .gt('id', 0);
+
+      if (error) {
+        console.warn('Supabase delete error:', error);
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEY_REGISTRY, '[]');
+    localStorage.setItem(STORAGE_KEY_COUNTER, '0');
+    currentScannedBooks = [];
+    currentAssignedRebox = null;
+    saveActiveSession();
+
+    updateUiState();
+    updateReboxCountStat();
+    renderFeed();
+    populateBoxDropdown();
+
+    if (document.getElementById('registryModal')?.classList.contains('active')) {
+      renderMasterRegistry();
+    }
+
+    playBeep('success');
+    showToast('✨ All box records wiped! Starting fresh at BOX-0001.');
+  } catch (err) {
+    console.error('Error resetting data:', err);
+    showToast('Reset error: ' + err.message, 'error');
+  }
+}
+
 // ── Sheet / CSV Import Logic ────────────────────────────────────────
 let currentParsedImportItems = [];
 
