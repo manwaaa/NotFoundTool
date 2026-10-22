@@ -1090,67 +1090,137 @@ function printBoxLabel() {
 function openIsbnTracerModal() {
   openModal('tracerModal');
   const input = document.getElementById('tracerSearchInput');
-  input.value = '';
-  document.getElementById('tracerResultsContainer').style.display = 'none';
-  document.getElementById('tracerEmptyState').style.display = 'block';
-  setTimeout(() => input.focus(), 100);
+  if (input) input.value = '';
+  const container = document.getElementById('tracerResultsContainer');
+  if (container) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+  }
+  const empty = document.getElementById('tracerEmptyState');
+  if (empty) {
+    empty.style.display = 'block';
+    empty.textContent = 'Type an ISBN or Book Title above to search across all historical Box manifests.';
+  }
+  setTimeout(() => { if (input) input.focus(); }, 100);
 }
 
 function traceBook(query) {
   const term = (query || '').trim().toLowerCase();
   const container = document.getElementById('tracerResultsContainer');
   const empty = document.getElementById('tracerEmptyState');
+  if (!container || !empty) return;
 
   if (term.length < 2) {
     container.style.display = 'none';
+    container.innerHTML = '';
     empty.style.display = 'block';
-    empty.textContent = 'Type an ISBN or Book Title to search across all historical Rebox manifests.';
+    empty.textContent = 'Type an ISBN or Book Title above to search across all historical Box manifests.';
     return;
   }
 
   const cleanQueryDigits = term.replace(/[^0-9X]/gi, '');
   const registry = getStoredRegistry();
-  let matchedBox = null;
-  let matchedBook = null;
+  const matches = [];
 
-  for (let box of registry) {
-    for (let book of (box.books || [])) {
-      // Check by clean ISBN if query has digits
+  for (const box of registry) {
+    const matchingBooks = [];
+    for (const book of (box.books || [])) {
       const bookIsbnClean = (book.isbn || '').replace(/[^0-9X]/gi, '').toLowerCase();
       const matchesIsbn = cleanQueryDigits.length >= 4 && bookIsbnClean.includes(cleanQueryDigits);
-      // Check by title
       const matchesTitle = (book.title || '').toLowerCase().includes(term);
 
       if (matchesIsbn || matchesTitle) {
-        matchedBox = box;
-        matchedBook = book;
-        break;
+        matchingBooks.push(book);
       }
     }
-    if (matchedBox) break;
+
+    if (matchingBooks.length > 0) {
+      matches.push({
+        box: box,
+        matchedBooks: matchingBooks
+      });
+    }
   }
 
-  if (matchedBox && matchedBook) {
-    container.style.display = 'flex';
-    empty.style.display = 'none';
-    document.getElementById('tracerResultBadge').textContent = matchedBox.rebox_number;
-    document.getElementById('tracerBookCount').textContent = matchedBox.book_count || (matchedBox.books || []).length;
-    document.getElementById('tracerDate').textContent = matchedBox.assigned_at_formatted || new Date(matchedBox.assigned_at).toLocaleDateString();
-
-    const itemDesc = matchedBook.is_isbn !== false && matchedBook.isbn && matchedBook.isbn !== 'NO-ISBN'
-      ? `ISBN: ${matchedBook.isbn} (${matchedBook.title})`
-      : `Title: "${matchedBook.title}" (Manual Entry)`;
-    document.getElementById('tracerMatchedItemDesc').textContent = itemDesc;
-
-    document.getElementById('tracerBtnViewBox').onclick = () => {
-      closeModal('tracerModal');
-      openInspectModalForBox(matchedBox);
-    };
-  } else {
+  if (matches.length === 0) {
     container.style.display = 'none';
+    container.innerHTML = '';
     empty.style.display = 'block';
-    empty.textContent = `No Box record found matching "${query}".`;
+    empty.textContent = `No Box record found matching "${escapeHtml(query)}".`;
+    return;
   }
+
+  empty.style.display = 'none';
+  container.style.display = 'flex';
+
+  const totalCopies = matches.reduce((acc, m) => acc + m.matchedBooks.length, 0);
+
+  let html = `
+    <div style="font-size: 12px; font-weight: 700; color: #4338ca; background: #eef2ff; border: 1px solid #c7d2fe; padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+      <span>⚡ Found in <strong>${matches.length}</strong> Different Box${matches.length === 1 ? '' : 'es'}</span>
+      <span style="font-size: 11px; color: #6366f1;">Total copies recorded: ${totalCopies}</span>
+    </div>
+  `;
+
+  matches.forEach(item => {
+    const b = item.box;
+    const boxNum = b.rebox_number || 'UNKNOWN';
+    const totalInBox = b.book_count || (b.books || []).length;
+    const sealedBy = b.sealed_by || 'Operator';
+    const dateFormatted = b.assigned_at_formatted || (b.assigned_at ? new Date(b.assigned_at).toLocaleDateString() : 'N/A');
+
+    const booksList = item.matchedBooks.map(bk => {
+      const isBarcode = bk.is_isbn !== false && bk.isbn && bk.isbn !== 'NO-ISBN';
+      const label = isBarcode
+        ? `<strong style="font-family:var(--font-mono); color:#4338ca;">${escapeHtml(bk.isbn)}</strong> — ${escapeHtml(bk.title || 'Physical Book')}`
+        : `📖 <strong>${escapeHtml(bk.title)}</strong> <span style="font-size:10px; color:#d97706;">(Manual Entry)</span>`;
+      const flagBadge = (bk.flag && bk.flag !== 'normal') ? `<span style="font-size:10px; color:#d97706; background:#fef3c7; padding:2px 6px; border-radius:4px; font-weight:600;">⚠️ ${escapeHtml(bk.flag)}</span>` : '';
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; font-size:12px; margin-top:4px;">
+          <div>${label}</div>
+          <div>${flagBadge}</div>
+        </div>
+      `;
+    }).join('');
+
+    html += `
+      <div style="background: #f8fafc; border: 1.5px solid #c7d2fe; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 0.5px;">BOX ASSIGNED</span>
+            <span style="font-size: 16px; font-weight: 800; font-family: var(--font-mono); color: #4f46e5; background: #ffffff; padding: 3px 10px; border-radius: 6px; border: 1px solid #c7d2fe;">
+              ${escapeHtml(boxNum)}
+            </span>
+          </div>
+          <button class="nav-btn primary" style="font-size: 11px; padding: 4px 10px;" onclick="viewRegistryBox('${escapeHtml(boxNum)}')">
+            📦 Inspect Manifest
+          </button>
+        </div>
+
+        <div>
+          <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">MATCHED COPIES IN THIS BOX (${item.matchedBooks.length}):</div>
+          ${booksList}
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 11px;">
+          <div>
+            <div style="font-size: 9px; color:#64748b; font-weight:700; text-transform:uppercase;">TOTAL IN BOX</div>
+            <div style="font-size: 13px; font-weight:700; color:#10b981;">${totalInBox} books</div>
+          </div>
+          <div>
+            <div style="font-size: 9px; color:#64748b; font-weight:700; text-transform:uppercase;">SEALED BY</div>
+            <div style="font-size: 12px; font-weight:600; color:#1e293b;">${escapeHtml(sealedBy)}</div>
+          </div>
+          <div>
+            <div style="font-size: 9px; color:#64748b; font-weight:700; text-transform:uppercase;">DATE SEALED</div>
+            <div style="font-size: 11px; font-weight:600; color:#0f172a;">${escapeHtml(dateFormatted)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
 }
 
 function traceIsbn(query) {
@@ -1211,6 +1281,7 @@ function viewRegistryBox(rbNumber) {
   const box = registry.find(r => r.rebox_number === rbNumber);
   if (box) {
     closeModal('registryModal');
+    closeModal('tracerModal');
     openInspectModalForBox(box);
   }
 }
