@@ -137,6 +137,7 @@ function switchMode(modeId) {
   window._currentInspectBox = null;
   pendingDuplicateParsed = null;
   closeModal('duplicateIsbnModal');
+  closeModal('assignBoxConfirmModal');
 
   // Load new mode's isolated session and registry state
   loadSavedActiveSession(activeMode);
@@ -620,6 +621,11 @@ function cancelDuplicateScan() {
 
 if (typeof document.addEventListener === 'function') {
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('assignBoxConfirmModal')?.classList.contains('active')) {
+      closeAssignBoxConfirmModal();
+      return;
+    }
+
     const isDupOpen = document.getElementById('duplicateIsbnModal')?.classList.contains('active');
     if (!isDupOpen) return;
     if (e.key === 'Escape') {
@@ -1153,6 +1159,42 @@ function buildLocalBoxRecord(boxNumber, operator, now, books) {
 }
 
 // ── Rebox Assignment & Closure (Core User Functionality) ────────────
+function requestAssignBoxAndClose() {
+  if (currentScannedBooks.length === 0) {
+    showToast('Cannot close an empty box. Please scan or record at least 1 book.', 'error');
+    return;
+  }
+  if (currentAssignedRebox) {
+    showToast(`This box is already assigned as ${currentAssignedRebox}.`, 'error');
+    return;
+  }
+
+  const modeCfg = getModeConfig();
+  const catEl = document.getElementById('confirmAssignCategory');
+  if (catEl) catEl.textContent = modeCfg.label;
+  const nextEl = document.getElementById('confirmAssignNextBox');
+  if (nextEl) nextEl.textContent = peekNextRbNumber(modeCfg.id);
+  const countEl = document.getElementById('confirmAssignBookCount');
+  if (countEl) countEl.textContent = `${currentScannedBooks.length} book${currentScannedBooks.length === 1 ? '' : 's'}`;
+  const opEl = document.getElementById('confirmAssignOperator');
+  if (opEl) opEl.textContent = currentOperatorName || 'Operator';
+
+  openModal('assignBoxConfirmModal');
+  const cancelBtn = document.getElementById('btnCancelAssignConfirm');
+  if (cancelBtn) setTimeout(() => cancelBtn.focus(), 20);
+}
+
+function closeAssignBoxConfirmModal() {
+  closeModal('assignBoxConfirmModal');
+  const scannerInput = document.getElementById('barcodeScannerInput');
+  if (scannerInput) scannerInput.focus();
+}
+
+async function confirmAssignBoxAndClose() {
+  closeModal('assignBoxConfirmModal');
+  await assignBoxAndClose();
+}
+
 async function assignBoxAndClose() {
   if (currentScannedBooks.length === 0) {
     showToast('Cannot close an empty box. Please scan or record at least 1 book.', 'error');

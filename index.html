@@ -334,7 +334,7 @@
         </div>
 
         <!-- Assign Box No. & Close Button -->
-        <button id="btnAssignBox" class="btn-action-green" onclick="assignBoxAndClose()" disabled>
+        <button id="btnAssignBox" class="btn-action-green" onclick="requestAssignBoxAndClose()" disabled>
           📦 Assign Box No. & Close
         </button>
 
@@ -739,6 +739,50 @@
         </button>
         <button id="duplicateProceedBtn" class="nav-btn primary" onclick="confirmDuplicateScan()">
           Proceed Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirm Assign Box & Close -->
+  <div id="assignBoxConfirmModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header" style="background: #ecfdf5; border-bottom-color: #a7f3d0;">
+        <h3 class="modal-title" style="color: #065f46;">
+          <span>📦</span> Confirm Box Assignment &amp; Close
+        </h3>
+        <button class="modal-close" onclick="closeAssignBoxConfirmModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="gap: 14px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+          <div>
+            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">CATEGORY</div>
+            <div id="confirmAssignCategory" style="font-size: 14px; font-weight: 800; color: var(--primary); margin-top: 2px;">Not Found</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">NEXT BOX NO.</div>
+            <div id="confirmAssignNextBox" style="font-size: 15px; font-weight: 800; font-family: var(--font-mono); color: #0f172a; margin-top: 2px;">BOX-0001</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">TOTAL BOOKS</div>
+            <div id="confirmAssignBookCount" style="font-size: 15px; font-weight: 800; font-family: var(--font-mono); color: #10b981; margin-top: 2px;">0</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">OPERATOR</div>
+            <div id="confirmAssignOperator" style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-top: 2px;">Operator</div>
+          </div>
+        </div>
+
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; color: #92400e; font-size: 12px; line-height: 1.5;">
+          ⚠️ Once closed, this box will be sealed and assigned a sequential box number. Please double-check that all scanned books belong in this box before confirming.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelAssignConfirm" class="nav-btn" onclick="closeAssignBoxConfirmModal()">
+          Cancel
+        </button>
+        <button id="btnProceedAssignConfirm" class="nav-btn" style="background: #10b981; color: #ffffff; border-color: #10b981; font-weight: 700;" onclick="confirmAssignBoxAndClose()">
+          ✓ Yes, Assign &amp; Close Box
         </button>
       </div>
     </div>
