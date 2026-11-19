@@ -1508,9 +1508,11 @@ function renderFeed() {
             <option value="stained" ${book.flag === 'stained' ? 'selected' : ''}>⚠️ Stained</option>
             <option value="mismatch" ${book.flag === 'mismatch' ? 'selected' : ''}>🔄 Mismatch</option>
           </select>
-          <button class="btn-delete-book" title="${currentAssignedRebox ? 'Remove from closed box' : 'Remove Entry'}" onclick="removeBookByIndex(${actualIndex})">
-            🗑️
-          </button>
+          ${(!currentAssignedRebox || isAdminUser()) ? `
+            <button class="btn-delete-book" title="${currentAssignedRebox ? 'Remove from closed box (Admin)' : 'Remove Entry'}" onclick="removeBookByIndex(${actualIndex})">
+              🗑️
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1547,6 +1549,11 @@ async function removeBookByIndex(idx) {
 }
 
 async function deleteBookFromClosedBox(boxNumber, modeId, bookIndex) {
+  if (!isAdminUser()) {
+    showToast('Administrator privileges required to delete items from a closed box.', 'error');
+    return;
+  }
+
   const cfg = getModeConfig(modeId);
   const registry = getStoredRegistry(modeId);
   const boxIdx = registry.findIndex(r => normalizeBoxNumber(r.rebox_number) === normalizeBoxNumber(boxNumber));
@@ -1728,9 +1735,11 @@ function openInspectModalForBox(boxRecord, modeId = activeMode) {
           <div class="book-right">
             ${b.flag && b.flag !== 'normal' ? `<span style="font-size:10px; font-weight:700; color:#d97706; background:#fef3c7; padding:2px 6px; border-radius:4px;">${escapeHtml(b.flag.toUpperCase())}</span>` : ''}
             <span class="book-time">${escapeHtml(b.scanned_at || '')}</span>
-            <button class="btn-delete-book" title="Delete from closed box" onclick="removeBookFromInspectBox(${idx})">
-              🗑️
-            </button>
+            ${isAdminUser() ? `
+              <button class="btn-delete-book" title="Delete from closed box (Admin)" onclick="removeBookFromInspectBox(${idx})">
+                🗑️
+              </button>
+            ` : ''}
           </div>
         </div>
       `;
@@ -2063,6 +2072,7 @@ function updateAdminControlsVisibility() {
   if (resetBtn) {
     resetBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   }
+  renderFeed();
 }
 
 function openMasterRegistryModal() {
