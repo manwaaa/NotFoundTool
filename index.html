@@ -273,13 +273,18 @@
           <!-- Dynamically filled -->
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="nav-btn" onclick="exportBoxCsv()">
-          📥 Export Box Manifest (CSV)
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <button id="btnTransferBox" class="nav-btn" style="color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; font-weight: 600;" onclick="transferCurrentInspectBox()">
+          🔄 Transfer to Others
         </button>
-        <button class="nav-btn primary" onclick="printBoxLabel()">
-          🖨️ Print Box Label
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="nav-btn" onclick="exportBoxCsv()">
+            📥 Export Box Manifest (CSV)
+          </button>
+          <button class="nav-btn primary" onclick="printBoxLabel()">
+            🖨️ Print Box Label
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -546,16 +551,16 @@
   </div>
 
   <!-- Hidden Print Container -->
-  <div id="printLabelContainer" style="display:none; font-family: sans-serif; padding: 20px; text-align: center;">
-    <div style="border: 3px solid #000; padding: 24px; border-radius: 8px; max-width: 400px; margin: 0 auto;">
-      <div id="printLabelHeader" style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">NOT FOUND · BOX TERMINAL</div>
-      <div id="printRbNumber" style="font-size: 42px; font-weight: 900; font-family: monospace; margin: 16px 0;">BOX-0001</div>
-      <div id="printDetails" style="font-size: 14px; font-weight: 600; line-height: 1.6;">
+  <div id="printLabelContainer" class="print-label-wrapper" style="display:none; font-family: sans-serif; padding: 20px; text-align: center;">
+    <div class="print-label-card" style="border: 3px solid #000; padding: 24px; border-radius: 8px; max-width: 400px; margin: 0 auto;">
+      <div id="printLabelHeader" class="print-label-header" style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">NOT FOUND · BOX TERMINAL</div>
+      <div id="printRbNumber" class="print-label-boxnum" style="font-size: 42px; font-weight: 900; font-family: monospace; margin: 16px 0;">BOX-0001</div>
+      <div id="printDetails" class="print-label-details" style="font-size: 14px; font-weight: 600; line-height: 1.6;">
         TOTAL BOOKS: 0<br>
         DATE: 2026-10-22<br>
         STATUS: SEALED & AUDITED
       </div>
-      <div style="margin-top: 16px; font-size: 11px; color: #555;">INBOUND VERIFICATION & AUDIT MANIFEST</div>
+      <div class="print-label-footer" style="margin-top: 16px; font-size: 11px; color: #555;">INBOUND VERIFICATION & AUDIT MANIFEST</div>
     </div>
   </div>
 

@@ -148,7 +148,6 @@ function switchMode(modeId) {
 
   if (isCloudConnected && supabaseClient) {
     fetchAndSyncSupabaseRegistry(activeMode);
-    attachSupabaseRealtime();
   }
 
   if (document.getElementById('registryModal')?.classList.contains('active')) {
@@ -404,6 +403,61 @@ function processScannedIsbn(rawVal) {
   processBookInput(rawVal);
 }
 
+function normalizeIsbn(val) {
+  return String(val || '').replace(/[^0-9X]/gi, '').toUpperCase();
+}
+
+function isBookMatchingIsbn(book, targetIsbn) {
+  return (
+    book &&
+    book.is_isbn !== false &&
+    book.isbn &&
+    book.isbn !== 'NO-ISBN' &&
+    normalizeIsbn(book.isbn) === targetIsbn
+  );
+}
+
+function findBoxesContainingIsbn(isbn, modeId = activeMode) {
+  const target = normalizeIsbn(isbn);
+  if (!target) return [];
+  const registry = getStoredRegistry(modeId);
+  return registry.filter(box =>
+    (box.books || []).some(b => isBookMatchingIsbn(b, target))
+  );
+}
+
+function findIsbnInOpenBox(isbn, modeId) {
+  const target = normalizeIsbn(isbn);
+  if (!target) return false;
+  if (modeId === activeMode) {
+    if (currentAssignedRebox) return false;
+    return currentScannedBooks.some(b => isBookMatchingIsbn(b, target));
+  }
+  try {
+    const raw = localStorage.getItem(getModeConfig(modeId).storageActive);
+    if (!raw) return false;
+    const session = JSON.parse(raw);
+    if (session.assignedRebox || !Array.isArray(session.books)) return false;
+    return session.books.some(b => isBookMatchingIsbn(b, target));
+  } catch {
+    return false;
+  }
+}
+
+function findBoxesAcrossModes(isbn) {
+  const results = [];
+  Object.keys(MODES).forEach(modeId => {
+    const boxes = findBoxesContainingIsbn(isbn, modeId);
+    if (boxes.length > 0) {
+      results.push({
+        mode: getModeConfig(modeId),
+        boxes
+      });
+    }
+  });
+  return results;
+}
+
 function processBookInput(rawInput) {
   // If active box is already closed, remind user to start next box
   if (currentAssignedRebox) {
@@ -421,15 +475,29 @@ function processBookInput(rawInput) {
 
   const parsed = parseBookString(trimmed);
 
-  // Check duplicate ISBN scans within current package (only if it's a barcode)
+  // Check duplicate ISBN scans across current open box, the other mode's open box, and all closed boxes in both modes
   if (parsed.is_isbn) {
-    const cleanIsbnDigits = parsed.isbn.replace(/[^0-9X]/gi, '');
-    const exists = currentScannedBooks.some(b => 
-      b.is_isbn !== false && b.isbn && b.isbn !== 'NO-ISBN' && b.isbn.replace(/[^0-9X]/gi, '') === cleanIsbnDigits
-    );
-    if (exists) {
+    if (findIsbnInOpenBox(parsed.isbn, activeMode)) {
       playBeep('error');
-      showToast(`ISBN ${parsed.isbn} is ALREADY scanned in this current package!`, 'error');
+      showToast(`ISBN ${escapeHtml(parsed.isbn)} is already scanned in the current box!`, 'error');
+      return;
+    }
+
+    const otherModeId = activeMode === 'not_found' ? 'others' : 'not_found';
+    if (findIsbnInOpenBox(parsed.isbn, otherModeId)) {
+      const otherLabel = getModeConfig(otherModeId).label;
+      playBeep('error');
+      showToast(`ISBN ${escapeHtml(parsed.isbn)} is already scanned in the open ${escapeHtml(otherLabel)} box!`, 'error');
+      return;
+    }
+
+    const modeMatches = findBoxesAcrossModes(parsed.isbn);
+    if (modeMatches.length > 0) {
+      const summary = modeMatches
+        .map(m => `${m.mode.label} (${m.boxes.map(b => b.rebox_number || 'UNKNOWN').join(', ')})`)
+        .join(', ');
+      playBeep('error');
+      showToast(`ISBN ${escapeHtml(parsed.isbn)} is already scanned in ${escapeHtml(summary)}!`, 'error');
       return;
     }
   }
@@ -683,8 +751,11 @@ async function connectToSupabase(config) {
     modeCloudReady = { not_found: true, others: true };
     setCloudStatus(true, config);
 
-    // Fetch initial registry & attach realtime subscription for active mode
-    await fetchAndSyncSupabaseRegistry(activeMode);
+    // Fetch initial registries for both modes & attach realtime subscriptions
+    await Promise.all([
+      fetchAndSyncSupabaseRegistry('not_found'),
+      fetchAndSyncSupabaseRegistry('others')
+    ]);
     attachSupabaseRealtime();
     console.log('Multi-user Supabase cloud sync connected successfully!');
   } catch (err) {
@@ -771,22 +842,27 @@ function attachSupabaseRealtime() {
     supabaseRealtimeChannel = null;
   }
 
-  const subscribedMode = activeMode;
-  const cfg = getModeConfig(subscribedMode);
-
   supabaseRealtimeChannel = supabaseClient
-    .channel(cfg.realtimeChannel)
+    .channel('all_reboxes_changes')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: cfg.tableName },
+      { event: '*', schema: 'public', table: MODES.not_found.tableName },
       (payload) => {
-        console.log(`Supabase realtime payload (${cfg.label}):`, payload);
-        fetchAndSyncSupabaseRegistry(subscribedMode);
+        console.log('Supabase realtime payload (Not Found):', payload);
+        fetchAndSyncSupabaseRegistry('not_found');
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: MODES.others.tableName },
+      (payload) => {
+        console.log('Supabase realtime payload (Others):', payload);
+        fetchAndSyncSupabaseRegistry('others');
       }
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log(`Connected to Supabase Realtime (${cfg.tableName}).`);
+        console.log('Connected to Supabase Realtime (Not Found & Others).');
       }
     });
 }
@@ -1018,6 +1094,21 @@ async function assignBoxAndClose() {
     // Update UI
     updateUiState();
     saveActiveSession(modeCfg.id);
+
+    // Pre-populate print label container with newly closed box details
+    const printHeaderEl = document.getElementById('printLabelHeader');
+    if (printHeaderEl) printHeaderEl.textContent = modeCfg.printHeader;
+    const printRbEl = document.getElementById('printRbNumber');
+    if (printRbEl) printRbEl.textContent = nextRb;
+    const printDetEl = document.getElementById('printDetails');
+    if (printDetEl) {
+      printDetEl.innerHTML = `
+        TOTAL BOOKS: ${newReboxRecord.book_count || (newReboxRecord.books || []).length}<br>
+        SEALED BY: ${(newReboxRecord.sealed_by || operator).toUpperCase()}<br>
+        DATE: ${now.toLocaleDateString()}<br>
+        STATUS: SEALED & AUDITED
+      `;
+    }
 
     if (savedLocallyDueToMissingTable) {
       showToast(`📦 ${modeCfg.label} ${nextRb} saved locally. Run updated Supabase SQL in Cloud Sync to enable cloud sync for ${modeCfg.label}.`);
@@ -1319,7 +1410,8 @@ function inspectSearchedRbBox() {
   openInspectModalForBox(matched);
 }
 
-function openInspectModalForBox(boxRecord) {
+function openInspectModalForBox(boxRecord, modeId = activeMode) {
+  boxRecord._modeId = modeId || boxRecord._modeId || activeMode;
   document.getElementById('inspectModalTitle').textContent = `Box ${boxRecord.rebox_number} Manifest`;
   document.getElementById('inspectBoxNumber').textContent = boxRecord.rebox_number;
   document.getElementById('inspectBookCount').textContent = boxRecord.book_count || (boxRecord.books || []).length;
@@ -1336,6 +1428,15 @@ function openInspectModalForBox(boxRecord) {
     DATE: ${new Date(boxRecord.assigned_at).toLocaleDateString()}<br>
     STATUS: SEALED & AUDITED
   `;
+
+  // Setup transfer button
+  const transferBtn = document.getElementById('btnTransferBox');
+  if (transferBtn) {
+    const srcMode = boxRecord._modeId || activeMode;
+    const targetMode = srcMode === 'not_found' ? 'others' : 'not_found';
+    transferBtn.textContent = `🔄 Transfer to ${MODES[targetMode].label}`;
+    transferBtn.title = `Transfer this box to ${MODES[targetMode].label}`;
+  }
 
   // Render books
   const listEl = document.getElementById('inspectBooksList');
@@ -1390,8 +1491,148 @@ function exportBoxCsv() {
   showToast(`Exported ${box.rebox_number} CSV.`);
 }
 
-function printBoxLabel() {
+function printBoxLabel(boxRecord) {
+  if (boxRecord && boxRecord.rebox_number) {
+    const printHeaderEl = document.getElementById('printLabelHeader');
+    if (printHeaderEl) printHeaderEl.textContent = getModeConfig().printHeader;
+    const printRbEl = document.getElementById('printRbNumber');
+    if (printRbEl) printRbEl.textContent = boxRecord.rebox_number;
+    const printDetEl = document.getElementById('printDetails');
+    if (printDetEl) {
+      printDetEl.innerHTML = `
+        TOTAL BOOKS: ${boxRecord.book_count || (boxRecord.books || []).length}<br>
+        SEALED BY: ${(boxRecord.sealed_by || 'OPERATOR').toUpperCase()}<br>
+        DATE: ${new Date(boxRecord.assigned_at).toLocaleDateString()}<br>
+        STATUS: SEALED & AUDITED
+      `;
+    }
+  }
   window.print();
+}
+
+async function transferCurrentInspectBox() {
+  const box = window._currentInspectBox;
+  if (!box || !box.rebox_number) return;
+
+  const srcModeId = box._modeId || activeMode;
+  const targetModeId = srcModeId === 'not_found' ? 'others' : 'not_found';
+  const srcConfig = getModeConfig(srcModeId);
+  const targetConfig = getModeConfig(targetModeId);
+
+  const transferBtn = document.getElementById('btnTransferBox');
+  if (transferBtn) {
+    transferBtn.disabled = true;
+    transferBtn.textContent = 'Calculating...';
+  }
+
+  // Calculate highest existing box number in destination mode
+  let maxNum = 0;
+  if (isCloudConnected && supabaseClient && modeCloudReady[targetConfig.id] !== false) {
+    try {
+      const { data, error } = await supabaseClient
+        .from(targetConfig.tableName)
+        .select('rebox_number');
+      if (!error && Array.isArray(data)) {
+        data.forEach(b => {
+          const digits = String(b.rebox_number || '').replace(/[^0-9]/g, '');
+          const n = parseInt(digits, 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        });
+      }
+    } catch (e) {
+      console.warn('Error fetching target box count:', e);
+    }
+  }
+
+  const localTargetReg = getStoredRegistry(targetModeId);
+  localTargetReg.forEach(b => {
+    const digits = String(b.rebox_number || '').replace(/[^0-9]/g, '');
+    const n = parseInt(digits, 10);
+    if (!isNaN(n) && n > maxNum) maxNum = n;
+  });
+
+  const nextBoxNum = 'BOX-' + String(maxNum + 1).padStart(4, '0');
+  const bookCount = box.book_count || (box.books || []).length;
+
+  if (transferBtn) {
+    transferBtn.disabled = false;
+    transferBtn.textContent = `🔄 Transfer to ${targetConfig.label}`;
+  }
+
+  const confirmed = confirm(
+    `Transfer ${box.rebox_number} from "${srcConfig.label}" to "${targetConfig.label}"?\n\n` +
+    `• Target Category: ${targetConfig.label}\n` +
+    `• New Sequential Box: ${nextBoxNum}\n` +
+    `• Total Books: ${bookCount}\n` +
+    `• Sealed By: ${box.sealed_by || 'Operator'}\n\n` +
+    `The box will be safely transferred to ${targetConfig.label} as ${nextBoxNum}. Continue?`
+  );
+
+  if (!confirmed) return;
+
+  if (transferBtn) {
+    transferBtn.disabled = true;
+    transferBtn.textContent = 'Transferring...';
+  }
+
+  try {
+    const newRecord = {
+      rebox_number: nextBoxNum,
+      sealed_by: box.sealed_by || 'Operator',
+      assigned_at: box.assigned_at || new Date().toISOString(),
+      assigned_at_formatted: box.assigned_at_formatted || '',
+      book_count: bookCount,
+      status: 'Closed',
+      books: box.books || []
+    };
+
+    if (isCloudConnected && supabaseClient && modeCloudReady[targetConfig.id] !== false && modeCloudReady[srcConfig.id] !== false) {
+      const { error: insErr } = await supabaseClient
+        .from(targetConfig.tableName)
+        .insert(newRecord);
+      if (insErr) throw insErr;
+
+      const { error: delErr } = await supabaseClient
+        .from(srcConfig.tableName)
+        .delete()
+        .eq('rebox_number', box.rebox_number);
+      if (delErr) {
+        console.warn('Supabase delete error during transfer:', delErr);
+      }
+    }
+
+    // Update local storage registries for both modes
+    const srcReg = getStoredRegistry(srcModeId).filter(b => b.rebox_number !== box.rebox_number);
+    localStorage.setItem(srcConfig.storageRegistry, JSON.stringify(srcReg));
+
+    const targetReg = getStoredRegistry(targetModeId).filter(b => b.rebox_number !== nextBoxNum);
+    targetReg.unshift(newRecord);
+    localStorage.setItem(targetConfig.storageRegistry, JSON.stringify(targetReg));
+
+    closeModal('inspectModal');
+
+    if (isCloudConnected && supabaseClient) {
+      await Promise.all([
+        fetchAndSyncSupabaseRegistry(srcModeId),
+        fetchAndSyncSupabaseRegistry(targetModeId)
+      ]);
+    }
+
+    playBeep('success');
+    showToast(`✅ Successfully transferred ${box.rebox_number} to ${targetConfig.label} as ${nextBoxNum}!`);
+
+    // Switch view to target mode so operator sees the new box immediately
+    switchMode(targetModeId);
+  } catch (err) {
+    console.error('Transfer failed:', err);
+    playBeep('error');
+    showToast('Failed to transfer box: ' + err.message, 'error');
+  } finally {
+    if (transferBtn) {
+      transferBtn.disabled = false;
+      transferBtn.textContent = `🔄 Transfer to ${targetConfig.label}`;
+    }
+  }
 }
 
 // ── Manager Item Tracer ─────────────────────────────────────────────

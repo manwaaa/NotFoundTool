@@ -1053,20 +1053,106 @@ body.mode-others .mode-tab.active .mode-tab-dot {
   gap: 10px;
 }
 
-/* Print Label Format */
+/* Hidden Print Container in Screen Mode */
+#printLabelContainer {
+  display: none;
+}
+
+/* Print Label Format - Strictly 1 Page Only */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: auto;
+    margin: 0;
   }
-  #printLabelContainer, #printLabelContainer * {
-    visibility: visible;
+
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  /* Completely remove all application screen UI from print rendering flow */
+  .navbar,
+  .main-wrapper,
+  .modal-backdrop,
+  .toast-container,
+  body > *:not(#printLabelContainer) {
+    display: none !important;
+  }
+
+  /* Single-page label container */
   #printLabelContainer {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 100%;
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: static !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 32px 16px !important;
+    margin: 0 auto !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-before: avoid !important;
+    break-after: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-label-card {
+    border: 3px solid #000000 !important;
+    border-radius: 8px !important;
+    padding: 24px 28px !important;
+    max-width: 400px !important;
+    width: 90% !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .print-label-header {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+  }
+
+  .print-label-boxnum {
+    font-size: 42px !important;
+    font-weight: 900 !important;
+    font-family: var(--font-mono), monospace !important;
+    margin: 14px 0 !important;
+    letter-spacing: 1px !important;
+  }
+
+  .print-label-details {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    line-height: 1.6 !important;
+  }
+
+  .print-label-footer {
+    margin-top: 14px !important;
+    font-size: 11px !important;
+    color: #444444 !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px !important;
   }
 }
 
