@@ -550,6 +550,55 @@
     </div>
   </div>
 
+  <!-- Modal: Duplicate ISBN Confirmation -->
+  <div id="duplicateIsbnModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header" style="background: #fffbeb; border-bottom-color: #fde68a;">
+        <h3 class="modal-title" style="color: #92400e;">
+          <span>⚠️</span> Duplicate ISBN Detected
+        </h3>
+        <button class="modal-close" onclick="cancelDuplicateScan()" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="gap: 12px;">
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px;">
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">SCANNED ISBN</div>
+          <div id="duplicateModalIsbn" style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: #0f172a; margin-top: 2px;"></div>
+          <div id="duplicateModalTitle" style="font-size: 12px; color: var(--text-sub); margin-top: 2px; display: none;"></div>
+        </div>
+
+        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 12px; color: #78350f; font-size: 12px; line-height: 1.5;">
+          <div style="font-weight: 700; margin-bottom: 4px;">Already scanned in:</div>
+          <ul id="duplicateModalLocations" style="margin: 0; padding-left: 18px; font-weight: 600;"></ul>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <input
+            type="text"
+            id="duplicateScannerInput"
+            class="form-input"
+            placeholder="Scan same barcode to Proceed, or press Enter to Cancel..."
+            autocomplete="off"
+            style="font-family: var(--font-mono); font-weight: 600; text-align: center;"
+            oninput="handleDuplicateModalInput(this.value)"
+            onkeydown="handleDuplicateModalKeyDown(event)"
+          >
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span>📷 Scan barcode again = <strong>Proceed</strong></span>
+            <span>↵ Press Enter (empty) = <strong>Cancel</strong></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="duplicateCancelBtn" class="nav-btn" onclick="cancelDuplicateScan()">
+          Cancel (Enter)
+        </button>
+        <button id="duplicateProceedBtn" class="nav-btn primary" onclick="confirmDuplicateScan()">
+          Proceed Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden Print Container -->
   <div id="printLabelContainer" class="print-label-wrapper" style="display:none; font-family: sans-serif; padding: 20px; text-align: center;">
     <div class="print-label-card" style="border: 3px solid #000; padding: 24px; border-radius: 8px; max-width: 400px; margin: 0 auto;">

@@ -133,6 +133,8 @@ function switchMode(modeId) {
   const regFilter = document.getElementById('registryFilterInput');
   if (regFilter) regFilter.value = '';
   window._currentInspectBox = null;
+  pendingDuplicateParsed = null;
+  closeModal('duplicateIsbnModal');
 
   // Load new mode's isolated session and registry state
   loadSavedActiveSession(activeMode);
@@ -458,6 +460,183 @@ function findBoxesAcrossModes(isbn) {
   return results;
 }
 
+let pendingDuplicateParsed = null;
+
+function findDuplicateLocations(isbn) {
+  const locations = [];
+
+  if (findIsbnInOpenBox(isbn, activeMode)) {
+    locations.push(`${getModeConfig(activeMode).label} — Current Open Box`);
+  }
+
+  const otherModeId = activeMode === 'not_found' ? 'others' : 'not_found';
+  if (findIsbnInOpenBox(isbn, otherModeId)) {
+    locations.push(`${getModeConfig(otherModeId).label} — Open Box`);
+  }
+
+  findBoxesAcrossModes(isbn).forEach(m => {
+    const boxNums = m.boxes.map(b => b.rebox_number || 'UNKNOWN').join(', ');
+    locations.push(`${m.mode.label} — ${boxNums}`);
+  });
+
+  return locations;
+}
+
+function recordParsedBook(parsed) {
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+
+  const book = {
+    isbn: parsed.isbn,
+    title: parsed.title,
+    is_isbn: parsed.is_isbn,
+    scanned_at: timeStr,
+    timestamp: now.toISOString(),
+    flag: 'normal',
+  };
+
+  currentScannedBooks.unshift(book);
+  playBeep('success');
+
+  if (parsed.is_isbn) {
+    showToast(`Scanned ISBN: ${escapeHtml(parsed.isbn)}`);
+  } else {
+    showToast(`Recorded Title: "${escapeHtml(parsed.title)}"`);
+  }
+
+  saveActiveSession();
+  updateUiState();
+}
+
+function openDuplicateIsbnModal(parsed, locations) {
+  pendingDuplicateParsed = parsed;
+
+  const isbnEl = document.getElementById('duplicateModalIsbn');
+  if (isbnEl) isbnEl.textContent = parsed.isbn;
+
+  const titleEl = document.getElementById('duplicateModalTitle');
+  if (titleEl) {
+    const hasCustomTitle = parsed.title && !parsed.title.startsWith('Physical Book (');
+    if (hasCustomTitle) {
+      titleEl.textContent = parsed.title;
+      titleEl.style.display = 'block';
+    } else {
+      titleEl.textContent = '';
+      titleEl.style.display = 'none';
+    }
+  }
+
+  const listEl = document.getElementById('duplicateModalLocations');
+  if (listEl) {
+    listEl.innerHTML = locations.map(loc => `<li>${escapeHtml(loc)}</li>`).join('');
+  }
+
+  const scannerModalInput = document.getElementById('duplicateScannerInput');
+  if (scannerModalInput) scannerModalInput.value = '';
+
+  openModal('duplicateIsbnModal');
+  if (scannerModalInput) {
+    scannerModalInput.focus();
+    setTimeout(() => scannerModalInput.focus(), 20);
+  }
+}
+
+function handleDuplicateModalInput(val) {
+  if (!document.getElementById('duplicateIsbnModal')?.classList.contains('active')) return;
+  if (!pendingDuplicateParsed) return;
+
+  const trimmed = (val || '').trim();
+  if (!trimmed) return;
+
+  const targetIsbn = normalizeIsbn(pendingDuplicateParsed.isbn);
+  const parsedInput = parseBookString(trimmed);
+  if (parsedInput.is_isbn && targetIsbn && normalizeIsbn(parsedInput.isbn) === targetIsbn) {
+    confirmDuplicateScan();
+  }
+}
+
+function handleDuplicateModalKeyDown(e) {
+  if (!document.getElementById('duplicateIsbnModal')?.classList.contains('active')) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    const input = document.getElementById('duplicateScannerInput');
+    const rawVal = (input && input.value ? input.value : '').trim();
+    if (input) input.value = '';
+
+    if (!rawVal) {
+      cancelDuplicateScan();
+      return;
+    }
+
+    const parsedConfirm = parseBookString(rawVal);
+    if (
+      parsedConfirm.is_isbn &&
+      pendingDuplicateParsed &&
+      normalizeIsbn(parsedConfirm.isbn) === normalizeIsbn(pendingDuplicateParsed.isbn)
+    ) {
+      confirmDuplicateScan();
+    } else {
+      // Different book scanned: cancel previous duplicate and process the new scan
+      cancelDuplicateScan();
+      processBookInput(rawVal);
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelDuplicateScan();
+  }
+}
+
+function confirmDuplicateScan() {
+  const parsed = pendingDuplicateParsed;
+  pendingDuplicateParsed = null;
+  const modalInput = document.getElementById('duplicateScannerInput');
+  if (modalInput) modalInput.value = '';
+  closeModal('duplicateIsbnModal');
+
+  if (parsed && !currentAssignedRebox) {
+    recordParsedBook(parsed);
+  }
+
+  const scannerInput = document.getElementById('barcodeScannerInput');
+  if (scannerInput) scannerInput.focus();
+}
+
+function cancelDuplicateScan() {
+  pendingDuplicateParsed = null;
+  const modalInput = document.getElementById('duplicateScannerInput');
+  if (modalInput) modalInput.value = '';
+  closeModal('duplicateIsbnModal');
+
+  const scannerInput = document.getElementById('barcodeScannerInput');
+  if (scannerInput) scannerInput.focus();
+}
+
+if (typeof document.addEventListener === 'function') {
+  document.addEventListener('keydown', (e) => {
+    const isDupOpen = document.getElementById('duplicateIsbnModal')?.classList.contains('active');
+    if (!isDupOpen) return;
+    if (e.key === 'Escape') {
+      cancelDuplicateScan();
+    } else if (
+      e.key === 'Enter' &&
+      document.activeElement?.id !== 'duplicateScannerInput' &&
+      document.activeElement?.id !== 'duplicateProceedBtn'
+    ) {
+      e.preventDefault();
+      cancelDuplicateScan();
+    }
+  });
+}
+
 function processBookInput(rawInput) {
   // If active box is already closed, remind user to start next box
   if (currentAssignedRebox) {
@@ -475,57 +654,17 @@ function processBookInput(rawInput) {
 
   const parsed = parseBookString(trimmed);
 
-  // Check duplicate ISBN scans across current open box, the other mode's open box, and all closed boxes in both modes
+  // Check duplicate ISBN scans across open boxes and closed boxes in both modes
   if (parsed.is_isbn) {
-    if (findIsbnInOpenBox(parsed.isbn, activeMode)) {
+    const locations = findDuplicateLocations(parsed.isbn);
+    if (locations.length > 0) {
       playBeep('error');
-      showToast(`ISBN ${escapeHtml(parsed.isbn)} is already scanned in the current box!`, 'error');
-      return;
-    }
-
-    const otherModeId = activeMode === 'not_found' ? 'others' : 'not_found';
-    if (findIsbnInOpenBox(parsed.isbn, otherModeId)) {
-      const otherLabel = getModeConfig(otherModeId).label;
-      playBeep('error');
-      showToast(`ISBN ${escapeHtml(parsed.isbn)} is already scanned in the open ${escapeHtml(otherLabel)} box!`, 'error');
-      return;
-    }
-
-    const modeMatches = findBoxesAcrossModes(parsed.isbn);
-    if (modeMatches.length > 0) {
-      const summary = modeMatches
-        .map(m => `${m.mode.label} (${m.boxes.map(b => b.rebox_number || 'UNKNOWN').join(', ')})`)
-        .join(', ');
-      playBeep('error');
-      showToast(`ISBN ${escapeHtml(parsed.isbn)} is already scanned in ${escapeHtml(summary)}!`, 'error');
+      openDuplicateIsbnModal(parsed, locations);
       return;
     }
   }
 
-  // Create new book entry
-  const now = new Date();
-  const timeStr = now.toTimeString().split(' ')[0];
-
-  const book = {
-    isbn: parsed.isbn,
-    title: parsed.title,
-    is_isbn: parsed.is_isbn,
-    scanned_at: timeStr,
-    timestamp: now.toISOString(),
-    flag: 'normal',
-  };
-
-  currentScannedBooks.unshift(book);
-  playBeep('success');
-
-  if (parsed.is_isbn) {
-    showToast(`Scanned ISBN: ${parsed.isbn}`);
-  } else {
-    showToast(`Recorded Title: "${parsed.title}"`);
-  }
-
-  saveActiveSession();
-  updateUiState();
+  recordParsedBook(parsed);
 }
 
 // ── Multi-User Cloud Realtime Sync & Operator Handling ─────────────
