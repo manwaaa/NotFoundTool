@@ -52,6 +52,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 40;
@@ -75,6 +77,12 @@ body {
   font-weight: 800;
   font-size: 20px;
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.mode-others .brand-logo {
+  background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
 }
 
 .brand-title {
@@ -98,16 +106,84 @@ body {
   border: 1px solid #c7d2fe;
 }
 
+body.mode-others .brand-badge {
+  background: #f0fdfa;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+
 .brand-subtitle {
   font-size: 12px;
   color: var(--text-muted);
   font-weight: 500;
 }
 
+/* Topnav Mode Switcher (Not Found / Others) */
+.mode-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: #f1f5f9;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.mode-tab:hover:not(.active) {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.mode-tab.active {
+  background: #ffffff;
+  color: #4338ca;
+  border-color: #e2e8f0;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+body.mode-others .mode-tab.active {
+  color: #0f766e;
+}
+
+.mode-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: background 0.15s ease;
+}
+
+.mode-tab.active .mode-tab-dot {
+  background: #4f46e5;
+}
+
+body.mode-others .mode-tab.active .mode-tab-dot {
+  background: #0d9488;
+}
+
 .nav-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .nav-btn {

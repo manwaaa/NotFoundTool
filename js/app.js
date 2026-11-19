@@ -1,9 +1,50 @@
-// Storage keys
-const STORAGE_KEY_REGISTRY = 'not_found_reboxes';
-const STORAGE_KEY_COUNTER = 'not_found_rb_counter';
-const STORAGE_KEY_ACTIVE = 'not_found_active_session';
+// Shared storage keys
 const STORAGE_KEY_CLOUD_CFG = 'not_found_cloud_config';
 const STORAGE_KEY_OPERATOR = 'not_found_operator_name';
+const STORAGE_KEY_ACTIVE_MODE = 'not_found_active_mode';
+
+// Per-mode isolated configuration (Not Found vs Others)
+const MODES = {
+  not_found: {
+    id: 'not_found',
+    label: 'Not Found',
+    shortCode: 'NF',
+    subtitle: 'Specialized intake & physical box aggregation for uncataloged / not found books',
+    printHeader: 'NOT FOUND · BOX TERMINAL',
+    exportPrefix: 'NotFound',
+    tableName: 'not_found_reboxes',
+    rpcName: 'claim_next_rebox',
+    realtimeChannel: 'not_found_reboxes_changes',
+    storageRegistry: 'not_found_reboxes',
+    storageCounter: 'not_found_rb_counter',
+    storageActive: 'not_found_active_session'
+  },
+  others: {
+    id: 'others',
+    label: 'Others',
+    shortCode: 'OT',
+    subtitle: 'Specialized intake & physical box aggregation for other / miscellaneous books',
+    printHeader: 'OTHERS · BOX TERMINAL',
+    exportPrefix: 'Others',
+    tableName: 'others_reboxes',
+    rpcName: 'claim_next_others_rebox',
+    realtimeChannel: 'others_reboxes_changes',
+    storageRegistry: 'others_reboxes',
+    storageCounter: 'others_rb_counter',
+    storageActive: 'others_active_session'
+  }
+};
+
+function getSavedActiveMode() {
+  const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_MODE);
+  return saved && MODES[saved] ? saved : 'not_found';
+}
+
+let activeMode = getSavedActiveMode();
+
+function getModeConfig(modeId = activeMode) {
+  return MODES[modeId] || MODES.not_found;
+}
 
 // Box Numbering Normalizer: Always enforces BOX-XXXX format (strictly 4 digits with BOX- prefix)
 function normalizeBoxNumber(val, fallbackNum = 1) {
@@ -31,19 +72,106 @@ let cameraInterval = null;
 let isCloudConnected = false;
 let supabaseClient = null;
 let supabaseRealtimeChannel = null;
+let modeCloudReady = { not_found: true, others: true };
+
+function updateModeChrome() {
+  const cfg = getModeConfig();
+  document.body.classList.toggle('mode-others', cfg.id === 'others');
+  document.title = `${cfg.label} — Box Terminal`;
+
+  const tabNotFound = document.getElementById('modeTabNotFound');
+  const tabOthers = document.getElementById('modeTabOthers');
+  if (tabNotFound) {
+    const isNf = cfg.id === 'not_found';
+    tabNotFound.classList.toggle('active', isNf);
+    tabNotFound.setAttribute('aria-selected', String(isNf));
+  }
+  if (tabOthers) {
+    const isOt = cfg.id === 'others';
+    tabOthers.classList.toggle('active', isOt);
+    tabOthers.setAttribute('aria-selected', String(isOt));
+  }
+
+  const brandLogo = document.getElementById('brandLogo');
+  if (brandLogo) brandLogo.textContent = cfg.shortCode;
+  const brandTitleText = document.getElementById('brandTitleText');
+  if (brandTitleText) brandTitleText.textContent = cfg.label;
+  const brandSubtitle = document.getElementById('brandSubtitle');
+  if (brandSubtitle) brandSubtitle.textContent = cfg.subtitle;
+
+  const tracerTitle = document.getElementById('tracerModalTitle');
+  if (tracerTitle) tracerTitle.textContent = `Manager Item Tracer — ${cfg.label}`;
+  const tracerDesc = document.getElementById('tracerModalDesc');
+  if (tracerDesc) {
+    tracerDesc.textContent = `Instantly trace any ${cfg.label} book by ISBN barcode or Book Title to discover its assigned Box number and closure timestamp.`;
+  }
+  const registryTitle = document.getElementById('registryModalTitle');
+  if (registryTitle) registryTitle.textContent = `Master Box Registry — ${cfg.label}`;
+  const importTitle = document.getElementById('importModalTitle');
+  if (importTitle) importTitle.textContent = `Import Existing Sheet / Box List — ${cfg.label}`;
+  const printHeader = document.getElementById('printLabelHeader');
+  if (printHeader) printHeader.textContent = cfg.printHeader;
+}
+
+function switchMode(modeId) {
+  if (!MODES[modeId] || modeId === activeMode) return;
+
+  // Persist current mode's in-progress session before switching
+  saveActiveSession(activeMode);
+
+  // Switch active mode
+  activeMode = modeId;
+  localStorage.setItem(STORAGE_KEY_ACTIVE_MODE, activeMode);
+
+  // Clear transient UI inputs
+  const scannerInput = document.getElementById('barcodeScannerInput');
+  if (scannerInput) scannerInput.value = '';
+  const searchRbInput = document.getElementById('searchRbInput');
+  if (searchRbInput) searchRbInput.value = '';
+  const boxDropdown = document.getElementById('boxSelectDropdown');
+  if (boxDropdown) boxDropdown.value = '';
+  const regFilter = document.getElementById('registryFilterInput');
+  if (regFilter) regFilter.value = '';
+  window._currentInspectBox = null;
+
+  // Load new mode's isolated session and registry state
+  loadSavedActiveSession(activeMode);
+  const reg = getStoredRegistry(activeMode);
+  if (reg.length === 0) {
+    localStorage.setItem(getModeConfig(activeMode).storageCounter, '0');
+  }
+
+  updateModeChrome();
+  updateUiState();
+  updateReboxCountStat();
+  setCloudStatus(isCloudConnected);
+
+  if (isCloudConnected && supabaseClient) {
+    fetchAndSyncSupabaseRegistry(activeMode);
+    attachSupabaseRealtime();
+  }
+
+  if (document.getElementById('registryModal')?.classList.contains('active')) {
+    renderMasterRegistry();
+  }
+
+  if (scannerInput) scannerInput.focus();
+  showToast(`Switched to ${getModeConfig().label} terminal.`);
+}
 
 // Load state on startup
 window.addEventListener('DOMContentLoaded', () => {
-  loadSavedActiveSession();
+  updateModeChrome();
+  loadSavedActiveSession(activeMode);
 
   // Restore Operator name
   const opInput = document.getElementById('operatorNameInput');
   if (opInput) opInput.value = currentOperatorName;
 
   // Ensure counter is clean if local registry is empty
-  const reg = getStoredRegistry();
+  const reg = getStoredRegistry(activeMode);
   if (reg.length === 0) {
-    localStorage.setItem(STORAGE_KEY_COUNTER, '0');
+    localStorage.setItem(getModeConfig(activeMode).storageCounter, '0');
   }
 
   updateUiState();
@@ -116,9 +244,10 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-function getStoredRegistry() {
+function getStoredRegistry(modeId = activeMode) {
+  const cfg = getModeConfig(modeId);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_REGISTRY);
+    const raw = localStorage.getItem(cfg.storageRegistry);
     const list = raw ? JSON.parse(raw) : [];
     let needsResave = false;
     list.forEach(r => {
@@ -131,7 +260,7 @@ function getStoredRegistry() {
       }
     });
     if (needsResave) {
-      localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(list));
+      localStorage.setItem(cfg.storageRegistry, JSON.stringify(list));
     }
     return list;
   } catch {
@@ -139,7 +268,8 @@ function getStoredRegistry() {
   }
 }
 
-function saveRegistry(list) {
+function saveRegistry(list, modeId = activeMode) {
+  const cfg = getModeConfig(modeId);
   if (Array.isArray(list)) {
     list.forEach(r => {
       if (r.rebox_number) {
@@ -147,12 +277,15 @@ function saveRegistry(list) {
       }
     });
   }
-  localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(list));
-  updateReboxCountStat();
+  localStorage.setItem(cfg.storageRegistry, JSON.stringify(list));
+  if (modeId === activeMode) {
+    updateReboxCountStat();
+  }
 }
 
-function getNextIncrementalRbNumber() {
-  const registry = getStoredRegistry();
+function getNextIncrementalRbNumber(modeId = activeMode) {
+  const cfg = getModeConfig(modeId);
+  const registry = getStoredRegistry(modeId);
   let maxNum = 0;
   registry.forEach(r => {
     const match = (r.rebox_number || '').match(/\d+/);
@@ -162,12 +295,12 @@ function getNextIncrementalRbNumber() {
     }
   });
   const nextNum = maxNum + 1;
-  localStorage.setItem(STORAGE_KEY_COUNTER, String(nextNum));
+  localStorage.setItem(cfg.storageCounter, String(nextNum));
   return `BOX-${String(nextNum).padStart(4, '0')}`;
 }
 
-function peekNextRbNumber() {
-  const registry = getStoredRegistry();
+function peekNextRbNumber(modeId = activeMode) {
+  const registry = getStoredRegistry(modeId);
   let maxNum = 0;
   registry.forEach(r => {
     const match = (r.rebox_number || '').match(/\d+/);
@@ -180,18 +313,25 @@ function peekNextRbNumber() {
   return `BOX-${String(nextNum).padStart(4, '0')}`;
 }
 
-function saveActiveSession() {
+function saveActiveSession(modeId = activeMode) {
+  const cfg = getModeConfig(modeId);
   const session = {
     books: currentScannedBooks,
     assignedRebox: currentAssignedRebox ? normalizeBoxNumber(currentAssignedRebox) : null,
   };
-  localStorage.setItem(STORAGE_KEY_ACTIVE, JSON.stringify(session));
+  localStorage.setItem(cfg.storageActive, JSON.stringify(session));
 }
 
-function loadSavedActiveSession() {
+function loadSavedActiveSession(modeId = activeMode) {
+  const cfg = getModeConfig(modeId);
+  currentScannedBooks = [];
+  currentAssignedRebox = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_ACTIVE);
-    if (!raw) return;
+    const raw = localStorage.getItem(cfg.storageActive);
+    if (!raw) {
+      updateUiState();
+      return;
+    }
     const session = JSON.parse(raw);
     if (Array.isArray(session.books)) {
       currentScannedBooks = session.books;
@@ -202,6 +342,7 @@ function loadSavedActiveSession() {
     updateUiState();
   } catch (e) {
     console.error('Error loading saved session:', e);
+    updateUiState();
   }
 }
 
@@ -331,8 +472,19 @@ function handleOperatorNameChange(val) {
 
 // ── Supabase Setup SQL & Clipboard Helper ───────────────────────────
 const SUPABASE_SETUP_SQL = `-- Run this in your Supabase SQL Editor:
--- 1. Create table for closed Boxes (if not exists)
+-- 1. Create tables for closed Boxes (Not Found & Others)
 create table if not exists not_found_reboxes (
+  id bigint generated by default as identity primary key,
+  rebox_number text unique not null,
+  sealed_by text default 'Operator',
+  assigned_at timestamptz not null default now(),
+  assigned_at_formatted text,
+  book_count integer not null default 0,
+  status text default 'Closed',
+  books jsonb not null default '[]'::jsonb
+);
+
+create table if not exists others_reboxes (
   id bigint generated by default as identity primary key,
   rebox_number text unique not null,
   sealed_by text default 'Operator',
@@ -345,6 +497,7 @@ create table if not exists not_found_reboxes (
 
 -- Disable Row Level Security so all warehouse stations can sync and read boxes
 alter table not_found_reboxes disable row level security;
+alter table others_reboxes disable row level security;
 
 -- 2. Enable Realtime updates (idempotent)
 do $$
@@ -358,12 +511,19 @@ begin
   ) then
     alter publication supabase_realtime add table not_found_reboxes;
   end if;
+
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'others_reboxes'
+  ) then
+    alter publication supabase_realtime add table others_reboxes;
+  end if;
 end $$;
 
--- 3. Reset table identity and clear test rows for fresh start at 1
-truncate table not_found_reboxes restart identity;
-
--- 4. Atomic Stored Procedure: Claim Single Box strictly sequentially (BOX-0001, BOX-0002, ...)
+-- 3. Atomic Stored Procedure: Claim Single Box for Not Found (BOX-0001, BOX-0002, ...)
 create or replace function claim_next_rebox(p_operator text, p_books jsonb)
 returns jsonb
 language plpgsql
@@ -382,7 +542,7 @@ begin
 
   -- Determine highest existing box number
   select coalesce(
-    max(nullif(regexp_replace(rebox_number, '\D', '', 'g'), '')::integer),
+    max(nullif(regexp_replace(rebox_number, '\\D', '', 'g'), '')::integer),
     0
   ) into max_num
   from not_found_reboxes;
@@ -399,7 +559,52 @@ begin
 
   return to_jsonb(new_row);
 end;
+$$;
+
+-- 4. Atomic Stored Procedure: Claim Single Box for Others (BOX-0001, BOX-0002, ...)
+create or replace function claim_next_others_rebox(p_operator text, p_books jsonb)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  max_num integer;
+  next_val integer;
+  box_str text;
+  now_ts timestamptz := now();
+  fmt_date text;
+  new_row others_reboxes%rowtype;
+begin
+  -- Advisory xact lock guarantees strictly serialized box assignment across all operators
+  perform pg_advisory_xact_lock(424243);
+
+  -- Determine highest existing box number
+  select coalesce(
+    max(nullif(regexp_replace(rebox_number, '\\D', '', 'g'), '')::integer),
+    0
+  ) into max_num
+  from others_reboxes;
+
+  next_val := max_num + 1;
+  box_str := 'BOX-' || lpad(next_val::text, 4, '0');
+  fmt_date := to_char(now_ts, 'Mon DD, YYYY, HH12:MI AM');
+
+  insert into others_reboxes (
+    rebox_number, sealed_by, assigned_at, assigned_at_formatted, book_count, status, books
+  ) values (
+    box_str, coalesce(p_operator, 'Operator'), now_ts, fmt_date, jsonb_array_length(p_books), 'Closed', p_books
+  ) returning * into new_row;
+
+  return to_jsonb(new_row);
+end;
 $$;`;
+
+function isMissingTableError(err) {
+  if (!err) return false;
+  const code = String(err.code || '').toUpperCase();
+  const msg = String(err.message || '').toLowerCase();
+  return code === 'PGRST205' || code === '42P01' || msg.includes('could not find the table') || msg.includes('does not exist');
+}
 
 function copySupabaseSql() {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -475,10 +680,11 @@ async function connectToSupabase(config) {
     const validUrl = cleanSupabaseUrl(config.supabaseUrl);
     supabaseClient = window.supabase.createClient(validUrl, config.supabaseAnonKey);
     isCloudConnected = true;
+    modeCloudReady = { not_found: true, others: true };
     setCloudStatus(true, config);
 
-    // Fetch initial registry & attach realtime subscription
-    await fetchAndSyncSupabaseRegistry();
+    // Fetch initial registry & attach realtime subscription for active mode
+    await fetchAndSyncSupabaseRegistry(activeMode);
     attachSupabaseRealtime();
     console.log('Multi-user Supabase cloud sync connected successfully!');
   } catch (err) {
@@ -488,15 +694,34 @@ async function connectToSupabase(config) {
   }
 }
 
-async function fetchAndSyncSupabaseRegistry() {
+async function fetchAndSyncSupabaseRegistry(targetMode = activeMode) {
   if (!isCloudConnected || !supabaseClient) return;
+  const cfg = getModeConfig(targetMode);
   try {
     const { data, error } = await supabaseClient
-      .from('not_found_reboxes')
+      .from(cfg.tableName)
       .select('*')
       .order('id', { ascending: false });
 
-    if (!error && Array.isArray(data)) {
+    if (error) {
+      if (isMissingTableError(error)) {
+        modeCloudReady[targetMode] = false;
+        if (targetMode === activeMode) {
+          setCloudStatus(true);
+        }
+        console.warn(`Supabase table "${cfg.tableName}" not found yet; using local storage for ${cfg.label}.`);
+      } else {
+        console.warn(`Error fetching Supabase registry for ${cfg.label}:`, error);
+      }
+      return;
+    }
+
+    modeCloudReady[targetMode] = true;
+    if (targetMode === activeMode) {
+      setCloudStatus(true);
+    }
+
+    if (Array.isArray(data)) {
       let maxCloudNum = 0;
       let hasRbRows = [];
       data.forEach(r => {
@@ -513,25 +738,28 @@ async function fetchAndSyncSupabaseRegistry() {
         }
       });
 
-      localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(data));
-      localStorage.setItem(STORAGE_KEY_COUNTER, String(maxCloudNum));
-      updateReboxCountStat();
-      updateUiState();
-      if (document.getElementById('registryModal')?.classList.contains('active')) {
-        renderMasterRegistry();
+      localStorage.setItem(cfg.storageRegistry, JSON.stringify(data));
+      localStorage.setItem(cfg.storageCounter, String(maxCloudNum));
+
+      if (targetMode === activeMode) {
+        updateReboxCountStat();
+        updateUiState();
+        if (document.getElementById('registryModal')?.classList.contains('active')) {
+          renderMasterRegistry();
+        }
       }
 
       // Lazily fix any legacy RB- rows in Supabase table
       if (hasRbRows.length > 0) {
         hasRbRows.forEach(async item => {
           if (item.id && item.newNum) {
-            await supabaseClient.from('not_found_reboxes').update({ rebox_number: item.newNum }).eq('id', item.id);
+            await supabaseClient.from(cfg.tableName).update({ rebox_number: item.newNum }).eq('id', item.id);
           }
         });
       }
     }
   } catch (err) {
-    console.warn('Error fetching Supabase registry:', err);
+    console.warn(`Error fetching Supabase registry for ${cfg.label}:`, err);
   }
 }
 
@@ -540,34 +768,40 @@ function attachSupabaseRealtime() {
 
   if (supabaseRealtimeChannel) {
     supabaseClient.removeChannel(supabaseRealtimeChannel);
+    supabaseRealtimeChannel = null;
   }
 
+  const subscribedMode = activeMode;
+  const cfg = getModeConfig(subscribedMode);
+
   supabaseRealtimeChannel = supabaseClient
-    .channel('not_found_reboxes_changes')
+    .channel(cfg.realtimeChannel)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'not_found_reboxes' },
+      { event: '*', schema: 'public', table: cfg.tableName },
       (payload) => {
-        console.log('Supabase realtime payload:', payload);
-        fetchAndSyncSupabaseRegistry();
+        console.log(`Supabase realtime payload (${cfg.label}):`, payload);
+        fetchAndSyncSupabaseRegistry(subscribedMode);
       }
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log('Connected to Supabase Realtime.');
+        console.log(`Connected to Supabase Realtime (${cfg.tableName}).`);
       }
     });
 }
 
 function setCloudStatus(connected, config = null) {
   isCloudConnected = connected;
+  const cfg = getModeConfig();
+  const tableReady = modeCloudReady[cfg.id] !== false;
   const dot = document.getElementById('cloudStatusDot');
   const text = document.getElementById('cloudStatusText');
   const banner = document.getElementById('cloudStatusBanner');
   const bannerIcon = document.getElementById('cloudBannerIcon');
   const bannerText = document.getElementById('cloudBannerText');
 
-  if (connected) {
+  if (connected && tableReady) {
     dot.style.background = '#10b981';
     text.textContent = 'Cloud: Live (Supabase)';
     if (banner) {
@@ -575,7 +809,17 @@ function setCloudStatus(connected, config = null) {
       banner.style.borderColor = '#a7f3d0';
       banner.style.color = '#065f46';
       bannerIcon.textContent = '🟢';
-      bannerText.textContent = 'Supabase Cloud Connected! Atomic box assignment active across all 10 operators.';
+      bannerText.textContent = `Supabase Cloud Connected! Atomic box assignment active for ${cfg.label}.`;
+    }
+  } else if (connected && !tableReady) {
+    dot.style.background = '#f59e0b';
+    text.textContent = `Cloud: ${cfg.label} SQL Needed`;
+    if (banner) {
+      banner.style.background = '#fffbeb';
+      banner.style.borderColor = '#fde68a';
+      banner.style.color = '#92400e';
+      bannerIcon.textContent = '⚠️';
+      bannerText.textContent = `Connected to Supabase, but table "${cfg.tableName}" is not created yet. Click "Copy Supabase Setup SQL" and run it in Supabase SQL Editor. Saving locally until then.`;
     }
   } else {
     dot.style.background = '#94a3b8';
@@ -595,6 +839,7 @@ function openCloudConfigModal() {
   document.getElementById('cfgSupabaseUrl').value = cfg.supabaseUrl || DEFAULT_SUPABASE_URL;
   document.getElementById('cfgSupabaseAnonKey').value = cfg.supabaseAnonKey || DEFAULT_SUPABASE_ANON_KEY;
   document.getElementById('cfgStationName').value = currentOperatorName;
+  setCloudStatus(isCloudConnected);
   openModal('cloudConfigModal');
 }
 
@@ -646,6 +891,18 @@ function disconnectCloud() {
   showToast('Switched to local offline mode.');
 }
 
+function buildLocalBoxRecord(boxNumber, operator, now, books) {
+  return {
+    rebox_number: boxNumber,
+    sealed_by: operator,
+    assigned_at: now.toISOString(),
+    assigned_at_formatted: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    book_count: books.length,
+    status: 'Closed',
+    books: [...books]
+  };
+}
+
 // ── Rebox Assignment & Closure (Core User Functionality) ────────────
 async function assignBoxAndClose() {
   if (currentScannedBooks.length === 0) {
@@ -657,22 +914,23 @@ async function assignBoxAndClose() {
     return;
   }
 
+  const modeCfg = getModeConfig();
   const btnAssign = document.getElementById('btnAssignBox');
   const originalText = btnAssign.innerHTML;
   btnAssign.disabled = true;
   btnAssign.textContent = '⏳ Claiming Box #...';
 
   let nextRb = null;
+  let savedLocallyDueToMissingTable = false;
 
   try {
     const operator = currentOperatorName || 'Operator';
     const now = new Date();
     let newReboxRecord = null;
 
-    if (isCloudConnected && supabaseClient) {
-      // ATOMIC TRANSACTION: PostgreSQL sequence nextval('rebox_counter_seq')
-      // Server serializes concurrent requests across all 10 users with zero collisions!
-      const { data: rpcResult, error: rpcError } = await supabaseClient.rpc('claim_next_rebox', {
+    if (isCloudConnected && supabaseClient && modeCloudReady[modeCfg.id] !== false) {
+      // ATOMIC TRANSACTION: PostgreSQL advisory-locked sequential box assignment
+      const { data: rpcResult, error: rpcError } = await supabaseClient.rpc(modeCfg.rpcName, {
         p_operator: operator,
         p_books: currentScannedBooks
       });
@@ -684,70 +942,74 @@ async function assignBoxAndClose() {
         if (nextRb.startsWith('RB-') || !nextRb.startsWith('BOX-')) {
           const cleanRb = normalizeBoxNumber(nextRb);
           if (rpcResult.id) {
-            await supabaseClient.from('not_found_reboxes').update({ rebox_number: cleanRb }).eq('id', rpcResult.id);
+            await supabaseClient.from(modeCfg.tableName).update({ rebox_number: cleanRb }).eq('id', rpcResult.id);
           }
           newReboxRecord.rebox_number = cleanRb;
           nextRb = cleanRb;
         }
       } else {
-        console.warn('claim_next_rebox RPC unavailable or errored; falling back to direct table query/insert:', rpcError);
-        const { data: existingRows } = await supabaseClient
-          .from('not_found_reboxes')
+        console.warn(`${modeCfg.rpcName} RPC unavailable or errored; falling back to direct table query/insert:`, rpcError);
+        const { data: existingRows, error: queryErr } = await supabaseClient
+          .from(modeCfg.tableName)
           .select('rebox_number')
           .order('id', { ascending: false })
           .limit(100);
 
-        let maxNum = 0;
-        (existingRows || []).forEach(r => {
-          const m = (r.rebox_number || '').match(/\d+/);
-          if (m) maxNum = Math.max(maxNum, parseInt(m[0], 10));
-        });
-        const nextNum = maxNum + 1;
-        nextRb = `BOX-${String(nextNum).padStart(4, '0')}`;
-        localStorage.setItem(STORAGE_KEY_COUNTER, String(nextNum));
+        if (isMissingTableError(queryErr)) {
+          modeCloudReady[modeCfg.id] = false;
+          setCloudStatus(true);
+          savedLocallyDueToMissingTable = true;
+          nextRb = getNextIncrementalRbNumber(modeCfg.id);
+          newReboxRecord = buildLocalBoxRecord(nextRb, operator, now, currentScannedBooks);
+        } else {
+          let maxNum = 0;
+          (existingRows || []).forEach(r => {
+            const m = (r.rebox_number || '').match(/\d+/);
+            if (m) maxNum = Math.max(maxNum, parseInt(m[0], 10));
+          });
+          const nextNum = maxNum + 1;
+          nextRb = `BOX-${String(nextNum).padStart(4, '0')}`;
+          localStorage.setItem(modeCfg.storageCounter, String(nextNum));
 
-        newReboxRecord = {
-          rebox_number: nextRb,
-          sealed_by: operator,
-          assigned_at: now.toISOString(),
-          assigned_at_formatted: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-          book_count: currentScannedBooks.length,
-          status: 'Closed',
-          books: [...currentScannedBooks]
-        };
+          newReboxRecord = buildLocalBoxRecord(nextRb, operator, now, currentScannedBooks);
 
-        const { data: insData, error: insErr } = await supabaseClient
-          .from('not_found_reboxes')
-          .insert([newReboxRecord])
-          .select()
-          .single();
+          const { data: insData, error: insErr } = await supabaseClient
+            .from(modeCfg.tableName)
+            .insert([newReboxRecord])
+            .select()
+            .single();
 
-        if (insErr) {
-          throw new Error('Supabase insert error: ' + insErr.message);
+          if (insErr) {
+            if (isMissingTableError(insErr)) {
+              modeCloudReady[modeCfg.id] = false;
+              setCloudStatus(true);
+              savedLocallyDueToMissingTable = true;
+              nextRb = getNextIncrementalRbNumber(modeCfg.id);
+              newReboxRecord = buildLocalBoxRecord(nextRb, operator, now, currentScannedBooks);
+            } else {
+              throw new Error('Supabase insert error: ' + insErr.message);
+            }
+          } else if (insData) {
+            newReboxRecord = insData;
+          }
         }
-        if (insData) newReboxRecord = insData;
       }
     } else {
       // Local fallback
-      nextRb = getNextIncrementalRbNumber();
-      newReboxRecord = {
-        rebox_number: nextRb,
-        sealed_by: operator,
-        assigned_at: now.toISOString(),
-        assigned_at_formatted: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        book_count: currentScannedBooks.length,
-        status: 'Closed',
-        books: [...currentScannedBooks]
-      };
+      if (isCloudConnected && modeCloudReady[modeCfg.id] === false) {
+        savedLocallyDueToMissingTable = true;
+      }
+      nextRb = getNextIncrementalRbNumber(modeCfg.id);
+      newReboxRecord = buildLocalBoxRecord(nextRb, operator, now, currentScannedBooks);
     }
 
     currentAssignedRebox = nextRb;
 
-    // Save into historical Rebox Registry cache
-    const registry = getStoredRegistry();
+    // Save into historical Rebox Registry cache for this mode
+    const registry = getStoredRegistry(modeCfg.id);
     if (!registry.some(r => r.rebox_number === nextRb)) {
       registry.unshift(newReboxRecord);
-      saveRegistry(registry);
+      saveRegistry(registry, modeCfg.id);
     }
 
     // Play success chime
@@ -755,9 +1017,13 @@ async function assignBoxAndClose() {
 
     // Update UI
     updateUiState();
-    saveActiveSession();
+    saveActiveSession(modeCfg.id);
 
-    showToast(`🎉 Box assigned: ${nextRb} (${newReboxRecord.book_count} books by ${operator}). Package is CLOSED.`);
+    if (savedLocallyDueToMissingTable) {
+      showToast(`📦 ${modeCfg.label} ${nextRb} saved locally. Run updated Supabase SQL in Cloud Sync to enable cloud sync for ${modeCfg.label}.`);
+    } else {
+      showToast(`🎉 [${modeCfg.label}] Box assigned: ${nextRb} (${newReboxRecord.book_count} books by ${operator}). Package is CLOSED.`);
+    }
 
   } catch (err) {
     console.error('Error assigning box:', err);
@@ -1061,6 +1327,8 @@ function openInspectModalForBox(boxRecord) {
   document.getElementById('inspectAssignedAt').textContent = `Closed on ${boxRecord.assigned_at_formatted || new Date(boxRecord.assigned_at).toLocaleString()}`;
 
   // Set print details
+  const printHeaderEl = document.getElementById('printLabelHeader');
+  if (printHeaderEl) printHeaderEl.textContent = getModeConfig().printHeader;
   document.getElementById('printRbNumber').textContent = boxRecord.rebox_number;
   document.getElementById('printDetails').innerHTML = `
     TOTAL BOOKS: ${boxRecord.book_count || (boxRecord.books || []).length}<br>
@@ -1116,7 +1384,7 @@ function exportBoxCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${box.rebox_number}-manifest.csv`;
+  a.download = `${getModeConfig().exportPrefix}-${box.rebox_number}-manifest.csv`;
   a.click();
   URL.revokeObjectURL(url);
   showToast(`Exported ${box.rebox_number} CSV.`);
@@ -1343,25 +1611,26 @@ function exportAllRegistryCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `NotFound-All-Boxes-${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `${getModeConfig().exportPrefix}-All-Boxes-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('Exported Master Box Registry.');
+  showToast(`Exported ${getModeConfig().label} Master Box Registry.`);
 }
 
 async function confirmResetAllData() {
+  const modeCfg = getModeConfig();
   const confirmed = confirm(
-    '⚠️ RESET ALL BOX DATA?\n\n' +
-    'This will permanently delete all recorded boxes from Supabase and local storage, restarting the counter at BOX-0001.\n\n' +
+    `⚠️ RESET ALL "${modeCfg.label.toUpperCase()}" BOX DATA?\n\n` +
+    `This will permanently delete all recorded ${modeCfg.label} boxes from Supabase and local storage, restarting the ${modeCfg.label} counter at BOX-0001.\n\n` +
     'Are you sure you want a fresh start?'
   );
 
   if (!confirmed) return;
 
   try {
-    if (isCloudConnected && supabaseClient) {
+    if (isCloudConnected && supabaseClient && modeCloudReady[modeCfg.id] !== false) {
       const { error } = await supabaseClient
-        .from('not_found_reboxes')
+        .from(modeCfg.tableName)
         .delete()
         .gt('id', 0);
 
@@ -1370,11 +1639,11 @@ async function confirmResetAllData() {
       }
     }
 
-    localStorage.setItem(STORAGE_KEY_REGISTRY, '[]');
-    localStorage.setItem(STORAGE_KEY_COUNTER, '0');
+    localStorage.setItem(modeCfg.storageRegistry, '[]');
+    localStorage.setItem(modeCfg.storageCounter, '0');
     currentScannedBooks = [];
     currentAssignedRebox = null;
-    saveActiveSession();
+    saveActiveSession(modeCfg.id);
 
     updateUiState();
     updateReboxCountStat();
@@ -1386,7 +1655,7 @@ async function confirmResetAllData() {
     }
 
     playBeep('success');
-    showToast('✨ All box records wiped! Starting fresh at BOX-0001.');
+    showToast(`✨ All ${modeCfg.label} box records wiped! Starting fresh at BOX-0001.`);
   } catch (err) {
     console.error('Error resetting data:', err);
     showToast('Reset error: ' + err.message, 'error');
@@ -1772,9 +2041,11 @@ async function executeImport() {
     }
 
     try {
-      const registry = getStoredRegistry();
+      const modeCfg = getModeConfig();
+      const registry = getStoredRegistry(modeCfg.id);
       const now = new Date();
       const operator = currentOperatorName || 'Import';
+      let useCloudForImport = isCloudConnected && supabaseClient && modeCloudReady[modeCfg.id] !== false;
 
       // Group items by normalized box number
       const boxMap = new Map();
@@ -1808,20 +2079,24 @@ async function executeImport() {
           books: books
         };
 
-        if (isCloudConnected && supabaseClient) {
+        if (useCloudForImport) {
           // Check if box already exists in Supabase
           const { data: existingBox, error: fetchErr } = await supabaseClient
-            .from('not_found_reboxes')
+            .from(modeCfg.tableName)
             .select('*')
             .eq('rebox_number', boxName)
             .maybeSingle();
 
-          if (!fetchErr && existingBox) {
+          if (isMissingTableError(fetchErr)) {
+            modeCloudReady[modeCfg.id] = false;
+            setCloudStatus(true);
+            useCloudForImport = false;
+          } else if (!fetchErr && existingBox) {
             // Merge books into existing box
             const existingBooks = Array.isArray(existingBox.books) ? existingBox.books : [];
             const mergedBooks = [...existingBooks, ...books];
             const { data: updatedBox, error: upErr } = await supabaseClient
-              .from('not_found_reboxes')
+              .from(modeCfg.tableName)
               .update({
                 books: mergedBooks,
                 book_count: mergedBooks.length,
@@ -1836,15 +2111,26 @@ async function executeImport() {
           } else {
             // Insert new box with exact boxName
             const { data: insertedBox, error: insErr } = await supabaseClient
-              .from('not_found_reboxes')
+              .from(modeCfg.tableName)
               .insert([newBoxRecord])
               .select()
               .single();
 
-            if (insErr) throw new Error(`Failed to insert ${boxName}: ${insErr.message}`);
-            newRecords.push(insertedBox || newBoxRecord);
+            if (insErr) {
+              if (isMissingTableError(insErr)) {
+                modeCloudReady[modeCfg.id] = false;
+                setCloudStatus(true);
+                useCloudForImport = false;
+              } else {
+                throw new Error(`Failed to insert ${boxName}: ${insErr.message}`);
+              }
+            } else {
+              newRecords.push(insertedBox || newBoxRecord);
+            }
           }
-        } else {
+        }
+
+        if (!useCloudForImport) {
           // Local fallback
           const existingIdx = registry.findIndex(r => normalizeBoxNumber(r.rebox_number) === boxName);
           if (existingIdx !== -1) {
@@ -1862,10 +2148,10 @@ async function executeImport() {
         assignedBoxNames.push(boxName);
       }
 
-      if (isCloudConnected && supabaseClient) {
-        await fetchAndSyncSupabaseRegistry();
+      if (useCloudForImport) {
+        await fetchAndSyncSupabaseRegistry(modeCfg.id);
       } else {
-        saveRegistry(registry);
+        saveRegistry(registry, modeCfg.id);
       }
 
       // Update counter based on highest imported box number
@@ -1874,14 +2160,14 @@ async function executeImport() {
         const m = name.match(/\d+/);
         if (m) maxNum = Math.max(maxNum, parseInt(m[0], 10));
       });
-      const curStored = parseInt(localStorage.getItem(STORAGE_KEY_COUNTER) || '0', 10);
-      localStorage.setItem(STORAGE_KEY_COUNTER, String(Math.max(curStored, maxNum)));
+      const curStored = parseInt(localStorage.getItem(modeCfg.storageCounter) || '0', 10);
+      localStorage.setItem(modeCfg.storageCounter, String(Math.max(curStored, maxNum)));
 
       updateUiState();
       closeModal('importModal');
       playBeep('box_closed');
 
-      showToast(`📥 Successfully imported ${currentParsedImportItems.length} books into ${importedBoxesCount} Box${importedBoxesCount === 1 ? '' : 'es'} (${assignedBoxNames.join(', ')})!`);
+      showToast(`📥 [${modeCfg.label}] Successfully imported ${currentParsedImportItems.length} books into ${importedBoxesCount} Box${importedBoxesCount === 1 ? '' : 'es'} (${assignedBoxNames.join(', ')})!`);
     } catch (err) {
       console.error('Import error:', err);
       showToast('Import failed: ' + err.message, 'error');

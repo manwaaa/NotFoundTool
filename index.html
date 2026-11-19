@@ -16,15 +16,27 @@
   <!-- Top Navigation Bar -->
   <header class="navbar">
     <div class="brand-container">
-      <div class="brand-logo">NF</div>
+      <div id="brandLogo" class="brand-logo">NF</div>
       <div>
         <div class="brand-title">
-          Not Found
+          <span id="brandTitleText">Not Found</span>
           <span class="brand-badge">Box Terminal</span>
         </div>
-        <div class="brand-subtitle">Specialized intake & physical box aggregation for uncataloged / not found books</div>
+        <div id="brandSubtitle" class="brand-subtitle">Specialized intake & physical box aggregation for uncataloged / not found books</div>
       </div>
     </div>
+
+    <nav class="mode-switcher" role="tablist" aria-label="Terminal Category">
+      <button type="button" id="modeTabNotFound" class="mode-tab active" role="tab" aria-selected="true" onclick="switchMode('not_found')">
+        <span class="mode-tab-dot"></span>
+        Not Found
+      </button>
+      <button type="button" id="modeTabOthers" class="mode-tab" role="tab" aria-selected="false" onclick="switchMode('others')">
+        <span class="mode-tab-dot"></span>
+        Others
+      </button>
+    </nav>
+
     <div class="nav-actions">
       <!-- Multi-User Realtime Cloud Sync Pill -->
       <button id="btnCloudSyncStatus" class="nav-btn" style="display: flex; align-items: center; gap: 6px; font-weight: 600;" onclick="openCloudConfigModal()" title="Configure Multi-User Realtime Cloud Sync">
@@ -277,12 +289,12 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>🔍</span> Manager Item Tracer (Find Box)
+          <span>🔍</span> <span id="tracerModalTitle">Manager Item Tracer — Not Found</span>
         </h3>
         <button class="modal-close" onclick="closeModal('tracerModal')">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+        <p id="tracerModalDesc" style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
           Instantly trace any Not Found book by ISBN barcode or Book Title to discover its assigned Box number and closure timestamp.
         </p>
         <input 
@@ -310,7 +322,7 @@
     <div class="modal-card" style="max-width: 820px;">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>📋</span> Master Box Registry
+          <span>📋</span> <span id="registryModalTitle">Master Box Registry — Not Found</span>
         </h3>
         <button class="modal-close" onclick="closeModal('registryModal')">✕</button>
       </div>
@@ -382,7 +394,7 @@
     <div class="modal-card" style="max-width: 680px;">
       <div class="modal-header">
         <h3 class="modal-title">
-          <span>📥</span> Import Existing Sheet / Box List
+          <span>📥</span> <span id="importModalTitle">Import Existing Sheet / Box List — Not Found</span>
         </h3>
         <button class="modal-close" onclick="closeModal('importModal')">✕</button>
       </div>
@@ -536,7 +548,7 @@
   <!-- Hidden Print Container -->
   <div id="printLabelContainer" style="display:none; font-family: sans-serif; padding: 20px; text-align: center;">
     <div style="border: 3px solid #000; padding: 24px; border-radius: 8px; max-width: 400px; margin: 0 auto;">
-      <div style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">NOT FOUND · BOX TERMINAL</div>
+      <div id="printLabelHeader" style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">NOT FOUND · BOX TERMINAL</div>
       <div id="printRbNumber" style="font-size: 42px; font-weight: 900; font-family: monospace; margin: 16px 0;">BOX-0001</div>
       <div id="printDetails" style="font-size: 14px; font-weight: 600; line-height: 1.6;">
         TOTAL BOOKS: 0<br>
