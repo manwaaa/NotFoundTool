@@ -13,50 +13,210 @@
 </head>
 <body>
 
+  <!-- Auth Portal Overlay (Sign In / Sign Up) -->
+  <div id="authOverlay" class="auth-overlay active" role="dialog" aria-modal="true" aria-labelledby="authBrandTitle">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">NF</div>
+        <div id="authBrandTitle" class="auth-brand-name">Not Found</div>
+        <div class="auth-portal-pill">
+          <span class="auth-pill-dot"></span>
+          <span>INVENTORY &amp; BOX TERMINAL</span>
+        </div>
+      </div>
+
+      <div class="auth-tabs" role="tablist" aria-label="Authentication Mode">
+        <button type="button" id="authTabSignIn" class="auth-tab active" role="tab" aria-selected="true" onclick="switchAuthTab('signin')">
+          <span>🔑</span> Sign In
+        </button>
+        <button type="button" id="authTabSignUp" class="auth-tab" role="tab" aria-selected="false" onclick="switchAuthTab('signup')">
+          <span>📝</span> Sign Up
+        </button>
+      </div>
+
+      <div id="authMessageBox" class="auth-message" style="display: none;"></div>
+
+      <!-- Sign In Form -->
+      <form id="authSignInForm" class="auth-form" onsubmit="handleSignInSubmit(event)">
+        <div class="auth-field">
+          <label class="auth-label" for="authLoginUsername">USERNAME</label>
+          <div class="auth-input-wrap">
+            <span class="auth-input-icon">👤</span>
+            <input
+              type="text"
+              id="authLoginUsername"
+              class="auth-input"
+              placeholder="Enter your username"
+              autocomplete="username"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <div class="auth-label-row">
+            <label class="auth-label" for="authLoginPassword">PASSWORD</label>
+            <button type="button" class="auth-link-btn" onclick="handleForgotPassword()">Forgot Password?</button>
+          </div>
+          <div class="auth-input-wrap">
+            <span class="auth-input-icon">🔒</span>
+            <input
+              type="password"
+              id="authLoginPassword"
+              class="auth-input has-toggle"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            >
+            <button type="button" class="auth-eye-btn" onclick="togglePasswordVisibility('authLoginPassword', this)" aria-label="Show or hide password">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" id="btnSignInSubmit" class="auth-submit-btn">
+          <span>Sign In</span>
+          <span>➔</span>
+        </button>
+
+        <div class="auth-footer-text">
+          New operator?
+          <button type="button" class="auth-footer-link" onclick="switchAuthTab('signup')">Register here</button>
+        </div>
+      </form>
+
+      <!-- Sign Up Form -->
+      <form id="authSignUpForm" class="auth-form" style="display: none;" onsubmit="handleSignUpSubmit(event)">
+        <div id="firstUserAdminNotice" style="display: none; padding: 10px 12px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 11px; font-weight: 600; line-height: 1.4;">
+          👑 <strong>First User Setup</strong>: The first account created will automatically receive full <strong>Administrator</strong> privileges.
+        </div>
+
+        <div class="auth-field">
+          <label class="auth-label" for="authRegUsername">USERNAME</label>
+          <div class="auth-input-wrap">
+            <span class="auth-input-icon">👤</span>
+            <input
+              type="text"
+              id="authRegUsername"
+              class="auth-input"
+              placeholder="Choose a username (e.g. User 5)"
+              autocomplete="username"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="auth-role-notice" style="padding: 10px 12px; border-radius: 8px; background: #f8fafc; border: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; line-height: 1.45;">
+          🛡️ <strong>Admin Approval Required:</strong> All new accounts require Administrator approval. Your role will be decided and assigned by an Administrator upon activation.
+        </div>
+
+        <div class="auth-field">
+          <label class="auth-label" for="authRegPassword">PASSWORD</label>
+          <div class="auth-input-wrap">
+            <span class="auth-input-icon">🔒</span>
+            <input
+              type="password"
+              id="authRegPassword"
+              class="auth-input has-toggle"
+              placeholder="Create a password (min 4 characters)"
+              autocomplete="new-password"
+              required
+            >
+            <button type="button" class="auth-eye-btn" onclick="togglePasswordVisibility('authRegPassword', this)" aria-label="Show or hide password">👁️</button>
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <label class="auth-label" for="authRegConfirmPassword">CONFIRM PASSWORD</label>
+          <div class="auth-input-wrap">
+            <span class="auth-input-icon">🛡️</span>
+            <input
+              type="password"
+              id="authRegConfirmPassword"
+              class="auth-input has-toggle"
+              placeholder="Re-enter your password"
+              autocomplete="new-password"
+              required
+            >
+            <button type="button" class="auth-eye-btn" onclick="togglePasswordVisibility('authRegConfirmPassword', this)" aria-label="Show or hide password">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" id="btnSignUpSubmit" class="auth-submit-btn">
+          <span>Create Account</span>
+          <span>➔</span>
+        </button>
+
+        <div class="auth-footer-text">
+          Already have an account?
+          <button type="button" class="auth-footer-link" onclick="switchAuthTab('signin')">Sign In</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Top Navigation Bar -->
   <header class="navbar">
-    <div class="brand-container">
-      <div id="brandLogo" class="brand-logo">NF</div>
-      <div>
-        <div class="brand-title">
-          <span id="brandTitleText">Not Found</span>
-          <span class="brand-badge">Box Terminal</span>
+    <div class="navbar-left">
+      <div class="brand-container">
+        <div id="brandLogo" class="brand-logo">NF</div>
+        <div class="brand-text-wrap">
+          <div class="brand-title">
+            <span id="brandTitleText">Not Found</span>
+            <span class="brand-badge">Box Terminal</span>
+          </div>
+          <div id="brandSubtitle" class="brand-subtitle">Specialized intake &amp; box aggregation for uncataloged books</div>
         </div>
-        <div id="brandSubtitle" class="brand-subtitle">Specialized intake & physical box aggregation for uncataloged / not found books</div>
       </div>
+
+      <nav class="mode-switcher" role="tablist" aria-label="Terminal Category">
+        <button type="button" id="modeTabNotFound" class="mode-tab active" role="tab" aria-selected="true" onclick="switchMode('not_found')">
+          <span class="mode-tab-dot"></span>
+          Not Found
+        </button>
+        <button type="button" id="modeTabOthers" class="mode-tab" role="tab" aria-selected="false" onclick="switchMode('others')">
+          <span class="mode-tab-dot"></span>
+          Others
+        </button>
+      </nav>
     </div>
 
-    <nav class="mode-switcher" role="tablist" aria-label="Terminal Category">
-      <button type="button" id="modeTabNotFound" class="mode-tab active" role="tab" aria-selected="true" onclick="switchMode('not_found')">
-        <span class="mode-tab-dot"></span>
-        Not Found
-      </button>
-      <button type="button" id="modeTabOthers" class="mode-tab" role="tab" aria-selected="false" onclick="switchMode('others')">
-        <span class="mode-tab-dot"></span>
-        Others
-      </button>
-    </nav>
-
     <div class="nav-actions">
-      <!-- Multi-User Realtime Cloud Sync Pill -->
-      <button id="btnCloudSyncStatus" class="nav-btn" style="display: flex; align-items: center; gap: 6px; font-weight: 600;" onclick="openCloudConfigModal()" title="Configure Multi-User Realtime Cloud Sync">
-        <span id="cloudStatusDot" class="status-dot" style="background: #94a3b8;"></span>
-        <span id="cloudStatusText">Cloud Sync: Local</span>
-      </button>
+      <!-- Status Indicators Group -->
+      <div class="nav-status-group">
+        <button id="btnCloudSyncStatus" class="nav-status-pill" onclick="openCloudConfigModal()" title="Configure Multi-User Realtime Cloud Sync">
+          <span id="cloudStatusDot" class="status-dot" style="background: #94a3b8;"></span>
+          <span id="cloudStatusText">Cloud: Local</span>
+        </button>
 
-      <div class="scanner-status-text" style="margin-right: 8px;">
-        <span class="status-dot"></span>
-        <span id="reboxCountStat">0 Closed Boxes</span>
+        <div class="nav-status-pill stat-counter-pill" title="Closed boxes in this category">
+          <span class="status-dot" style="background: #10b981;"></span>
+          <span id="reboxCountStat">0 Closed Boxes</span>
+        </div>
       </div>
-      <button class="nav-btn" onclick="openIsbnTracerModal()">
-        🔍 Trace Any Item
-      </button>
-      <button class="nav-btn" onclick="openImportModal()">
-        📥 Import Sheet / CSV
-      </button>
-      <button class="nav-btn primary" onclick="openMasterRegistryModal()">
-        📋 Master Box Registry
-      </button>
+
+      <!-- Action Buttons Group -->
+      <div class="nav-btn-group">
+        <button class="nav-btn" onclick="openIsbnTracerModal()" title="Trace any ISBN barcode or book title across manifests">
+          🔍 Trace Item
+        </button>
+        <button class="nav-btn" onclick="openImportModal()" title="Import sheet or CSV box list">
+          📥 Import CSV
+        </button>
+        <button class="nav-btn primary" onclick="openMasterRegistryModal()" title="Open Master Box Registry">
+          📋 Master Registry
+        </button>
+        <button id="btnUserManagement" class="nav-btn" style="display: none;" onclick="openUserManagementModal()" title="Manage Users &amp; Pending Approvals">
+          👥 Users
+          <span id="pendingUsersCountBadge" class="pending-badge" style="display: none;">0</span>
+        </button>
+      </div>
+
+      <!-- User Account Badge -->
+      <div id="authUserBadge" class="auth-user-pill" style="display: none;">
+        <span>👤</span>
+        <span id="authUserNameLabel" style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Operator</span>
+        <span id="authUserRoleBadge" class="auth-role-tag staff">STAFF</span>
+        <button type="button" class="auth-signout-btn" onclick="signOutUser()" title="Sign Out">Sign Out</button>
+      </div>
     </div>
   </header>
 
@@ -137,21 +297,6 @@
           </div>
         </div>
 
-        <!-- Operator Identity Row -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 7px 12px; margin-bottom: 4px;">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="font-size: 13px;">👤</span>
-            <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Operator / Station:</span>
-          </div>
-          <input 
-            type="text" 
-            id="operatorNameInput" 
-            placeholder="e.g. User 5, User 7" 
-            style="width: 140px; height: 28px; font-size: 11px; font-weight: 600; padding: 2px 8px; border: 1px solid var(--border-color); border-radius: 6px; background: #ffffff;"
-            oninput="handleOperatorNameChange(this.value)"
-          >
-        </div>
-
         <!-- Scanner Input -->
         <div class="scanner-input-container">
           <input 
@@ -165,7 +310,7 @@
           >
           <div class="scanner-status-row">
             <span class="scanner-status-text">
-              <span class="status-dot" style="background:#6366f1;"></span>
+              <span class="status-dot" style="background: var(--border-focus); box-shadow: 0 0 0 3px var(--focus-ring);"></span>
               Barcode Scanner & Title Input Ready
             </span>
             <span class="key-badge">Press Enter</span>
@@ -178,7 +323,7 @@
           <div class="counter-label-group">
             <span class="counter-label">CURRENT BOX SCANS</span>
             <span id="boxScanStatus" class="counter-sub">
-              <span class="status-dot" style="background:#6366f1;"></span>
+              <span class="status-dot" style="background: var(--border-focus); box-shadow: 0 0 0 3px var(--focus-ring);"></span>
               Pending Assignment
             </span>
           </div>
@@ -248,7 +393,7 @@
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
           <div>
             <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">BOX NO.</div>
-            <div id="inspectBoxNumber" style="font-size: 16px; font-weight:800; font-family:var(--font-mono); color:#4f46e5;">BOX-0001</div>
+            <div id="inspectBoxNumber" style="font-size: 16px; font-weight:800; font-family:var(--font-mono); color: var(--primary);">BOX-0001</div>
           </div>
           <div>
             <div style="font-size: 10px; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL BOOKS</div>
@@ -274,7 +419,7 @@
         </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <button id="btnTransferBox" class="nav-btn" style="color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; font-weight: 600;" onclick="transferCurrentInspectBox()">
+        <button id="btnTransferBox" class="nav-btn" style="color: var(--primary); border-color: var(--primary-border); background: var(--primary-light); font-weight: 600;" onclick="transferCurrentInspectBox()">
           🔄 Transfer to Others
         </button>
         <div style="display: flex; gap: 8px;">
@@ -355,10 +500,10 @@
         </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <button class="nav-btn" style="color: #ef4444; border-color: #fca5a5; background: #fff5f5; font-weight: 700;" onclick="confirmResetAllData()">
+        <button id="btnResetAllData" class="nav-btn" style="display: none; color: #ef4444; border-color: #fca5a5; background: #fff5f5; font-weight: 700;" onclick="confirmResetAllData()">
           🗑️ Reset / Fresh Start (Clear All)
         </button>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; margin-left: auto;">
           <button class="nav-btn" onclick="exportAllRegistryCsv()">
             📥 Export All Boxes (CSV)
           </button>
@@ -594,6 +739,85 @@
         </button>
         <button id="duplicateProceedBtn" class="nav-btn primary" onclick="confirmDuplicateScan()">
           Proceed Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: User Management & Approvals (Admin Only) -->
+  <div id="userManagementModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 860px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>👥</span> User Management &amp; Approvals
+        </h3>
+        <button class="modal-close" onclick="closeModal('userManagementModal')">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+
+        <!-- Summary Cards Row -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Users</div>
+            <div id="userStatTotal" style="font-size: 18px; font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">0</div>
+          </div>
+          <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; font-weight: 700; color: #854d0e; text-transform: uppercase;">Pending Approval</div>
+            <div id="userStatPending" style="font-size: 18px; font-weight: 800; color: #ca8a04; font-family: var(--font-mono);">0</div>
+          </div>
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase;">Approved Staff</div>
+            <div id="userStatStaff" style="font-size: 18px; font-weight: 800; color: #16a34a; font-family: var(--font-mono);">0</div>
+          </div>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Admins</div>
+            <div id="userStatAdmin" style="font-size: 18px; font-weight: 800; color: #2563eb; font-family: var(--font-mono);">0</div>
+          </div>
+        </div>
+
+        <!-- Filter and Search Row -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 6px;" role="tablist">
+            <button type="button" class="nav-btn user-filter-btn active" data-filter="all" onclick="filterUserList('all')">All</button>
+            <button type="button" class="nav-btn user-filter-btn" data-filter="pending" onclick="filterUserList('pending')">Pending Approval <span id="userFilterPendingBadge" class="pending-badge" style="display:none;">0</span></button>
+            <button type="button" class="nav-btn user-filter-btn" data-filter="approved" onclick="filterUserList('approved')">Approved</button>
+            <button type="button" class="nav-btn user-filter-btn" data-filter="rejected" onclick="filterUserList('rejected')">Rejected</button>
+          </div>
+          <input
+            type="text"
+            id="userSearchInput"
+            class="form-input"
+            placeholder="Search username or role..."
+            style="max-width: 260px; height: 36px; font-size: 13px;"
+            oninput="renderUserManagementList()"
+          >
+        </div>
+
+        <!-- Users Table -->
+        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; max-height: 380px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 1px solid var(--border-color); color: #475569; font-size: 11px; text-transform: uppercase;">
+                <th style="padding: 10px 14px;">User</th>
+                <th style="padding: 10px 14px;">Role</th>
+                <th style="padding: 10px 14px;">Status</th>
+                <th style="padding: 10px 14px;">Joined / Approved</th>
+                <th style="padding: 10px 14px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="userManagementTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11px; color: var(--text-muted);">
+          🛡️ Admin access: approvals take effect immediately across all warehouse stations.
+        </span>
+        <button class="nav-btn primary" onclick="closeModal('userManagementModal')">
+          Done
         </button>
       </div>
     </div>
