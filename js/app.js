@@ -621,6 +621,11 @@ function cancelDuplicateScan() {
 
 if (typeof document.addEventListener === 'function') {
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('adminResetPasswordModal')?.classList.contains('active')) {
+      closeModal('adminResetPasswordModal');
+      return;
+    }
+
     if (e.key === 'Escape' && document.getElementById('assignBoxConfirmModal')?.classList.contains('active')) {
       closeAssignBoxConfirmModal();
       return;
@@ -3438,6 +3443,9 @@ function renderUserManagementList() {
             <option value="staff" ${role === 'staff' ? 'selected' : ''}>Staff</option>
             <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
           </select>
+          <button class="btn-action-sm" onclick="openAdminResetPasswordModal('${escapeHtml(u.username)}')" title="Set a new password for this user">
+            🔑 Reset PW
+          </button>
           <button class="btn-action-sm" style="color:#b91c1c;" onclick="rejectUser('${escapeHtml(u.username)}')" title="Deactivate / Suspend User" ${isSelf ? 'disabled' : ''}>
             Suspend
           </button>
@@ -3673,5 +3681,126 @@ async function deleteUserAccount(username) {
   } catch (err) {
     console.error('Delete failed:', err);
     showToast('Failed to delete user: ' + err.message, 'error');
+  }
+}
+
+let pendingResetPwUsername = '';
+
+function setResetPwError(msg = '') {
+  const box = document.getElementById('resetPwErrorBox');
+  if (!box) return;
+  if (!msg) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+
+function openAdminResetPasswordModal(username) {
+  if (!isAdminUser()) {
+    showToast('Administrator privileges required to reset passwords.', 'error');
+    return;
+  }
+
+  pendingResetPwUsername = username || '';
+  const targetEl = document.getElementById('resetPwTargetUser');
+  if (targetEl) targetEl.textContent = pendingResetPwUsername;
+
+  const newInput = document.getElementById('resetPwNewInput');
+  const confirmInput = document.getElementById('resetPwConfirmInput');
+  if (newInput) {
+    newInput.value = '';
+    newInput.type = 'password';
+  }
+  if (confirmInput) {
+    confirmInput.value = '';
+    confirmInput.type = 'password';
+  }
+  setResetPwError('');
+
+  openModal('adminResetPasswordModal');
+  if (newInput) setTimeout(() => newInput.focus(), 20);
+}
+
+async function handleAdminResetPasswordSubmit(e) {
+  if (e) e.preventDefault();
+  setResetPwError('');
+
+  if (!isAdminUser()) {
+    showToast('Administrator privileges required to reset passwords.', 'error');
+    closeModal('adminResetPasswordModal');
+    return;
+  }
+
+  const username = pendingResetPwUsername;
+  const usernameLower = username.toLowerCase();
+  const newInput = document.getElementById('resetPwNewInput');
+  const confirmInput = document.getElementById('resetPwConfirmInput');
+  const saveBtn = document.getElementById('btnSaveResetPw');
+
+  const newPassword = newInput ? newInput.value : '';
+  const confirmPassword = confirmInput ? confirmInput.value : '';
+
+  if (!username) {
+    setResetPwError('No target user selected.');
+    return;
+  }
+  if (newPassword.length < 4) {
+    setResetPwError('Password must be at least 4 characters.');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    setResetPwError('Passwords do not match.');
+    return;
+  }
+
+  const originalHtml = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+  }
+
+  try {
+    const newHash = await hashPassword(newPassword, usernameLower);
+
+    if (isCloudConnected && supabaseClient) {
+      const { error } = await supabaseClient
+        .from('app_users')
+        .update({ password_hash: newHash })
+        .eq('username_lower', usernameLower);
+      if (error && !isMissingTableError(error)) {
+        throw new Error(error.message);
+      }
+    }
+
+    const local = getStoredLocalUsers();
+    const idx = local.findIndex(u => u.username_lower === usernameLower);
+    if (idx >= 0) {
+      local[idx].password_hash = newHash;
+      saveLocalUsers(local);
+    }
+
+    const cIdx = cachedUsersList.findIndex(u => u.username_lower === usernameLower);
+    if (cIdx >= 0) {
+      cachedUsersList[cIdx].password_hash = newHash;
+    }
+
+    if (newInput) newInput.value = '';
+    if (confirmInput) confirmInput.value = '';
+    pendingResetPwUsername = '';
+    closeModal('adminResetPasswordModal');
+
+    playBeep('success');
+    showToast(`🔑 Password reset for "${escapeHtml(username)}".`);
+  } catch (err) {
+    console.error('Password reset failed:', err);
+    setResetPwError('Failed to reset password: ' + err.message);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalHtml;
+    }
   }
 }
