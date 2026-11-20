@@ -12,7 +12,7 @@ const MODES = {
     label: 'Not Found',
     shortCode: 'NF',
     subtitle: 'Specialized intake & physical box aggregation for uncataloged / not found books',
-    printHeader: 'NOT FOUND · BOX TERMINAL',
+    printHeader: 'NOT FOUND',
     exportPrefix: 'NotFound',
     tableName: 'not_found_reboxes',
     rpcName: 'claim_next_rebox',
@@ -26,7 +26,7 @@ const MODES = {
     label: 'Others',
     shortCode: 'OT',
     subtitle: 'Specialized intake & physical box aggregation for other / miscellaneous books',
-    printHeader: 'OTHERS · BOX TERMINAL',
+    printHeader: 'OTHERS',
     exportPrefix: 'Others',
     tableName: 'others_reboxes',
     rpcName: 'claim_next_others_rebox',
@@ -621,6 +621,11 @@ function cancelDuplicateScan() {
 
 if (typeof document.addEventListener === 'function') {
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('printPreviewModal')?.classList.contains('active')) {
+      closeModal('printPreviewModal');
+      return;
+    }
+
     if (e.key === 'Escape' && document.getElementById('assignBoxConfirmModal')?.classList.contains('active')) {
       closeAssignBoxConfirmModal();
       return;
@@ -1311,19 +1316,7 @@ async function assignBoxAndClose() {
     saveActiveSession(modeCfg.id);
 
     // Pre-populate print label container with newly closed box details
-    const printHeaderEl = document.getElementById('printLabelHeader');
-    if (printHeaderEl) printHeaderEl.textContent = modeCfg.printHeader;
-    const printRbEl = document.getElementById('printRbNumber');
-    if (printRbEl) printRbEl.textContent = nextRb;
-    const printDetEl = document.getElementById('printDetails');
-    if (printDetEl) {
-      printDetEl.innerHTML = `
-        TOTAL BOOKS: ${newReboxRecord.book_count || (newReboxRecord.books || []).length}<br>
-        SEALED BY: ${(newReboxRecord.sealed_by || operator).toUpperCase()}<br>
-        DATE: ${now.toLocaleDateString()}<br>
-        STATUS: SEALED & AUDITED
-      `;
-    }
+    populatePrintSlip(newReboxRecord, modeCfg.id);
 
     if (savedLocallyDueToMissingTable) {
       showToast(`📦 ${modeCfg.label} ${nextRb} saved locally. Run updated Supabase SQL in Cloud Sync to enable cloud sync for ${modeCfg.label}.`);
@@ -1728,15 +1721,7 @@ function openInspectModalForBox(boxRecord, modeId = activeMode) {
   document.getElementById('inspectAssignedAt').textContent = `Closed on ${boxRecord.assigned_at_formatted || new Date(boxRecord.assigned_at).toLocaleString()}`;
 
   // Set print details
-  const printHeaderEl = document.getElementById('printLabelHeader');
-  if (printHeaderEl) printHeaderEl.textContent = getModeConfig().printHeader;
-  document.getElementById('printRbNumber').textContent = boxRecord.rebox_number;
-  document.getElementById('printDetails').innerHTML = `
-    TOTAL BOOKS: ${boxRecord.book_count || (boxRecord.books || []).length}<br>
-    SEALED BY: ${(boxRecord.sealed_by || 'OPERATOR').toUpperCase()}<br>
-    DATE: ${new Date(boxRecord.assigned_at).toLocaleDateString()}<br>
-    STATUS: SEALED & AUDITED
-  `;
+  populatePrintSlip(boxRecord, boxRecord._modeId || activeMode);
 
   // Setup transfer button
   const transferBtn = document.getElementById('btnTransferBox');
@@ -1814,22 +1799,56 @@ function exportBoxCsv() {
   showToast(`Exported ${box.rebox_number} CSV.`);
 }
 
+function buildBatchSlipCardHtml(boxRecord, modeId = activeMode) {
+  const cfg = getModeConfig(modeId || boxRecord?._modeId || activeMode);
+  const boxNum = (boxRecord && boxRecord.rebox_number) ? boxRecord.rebox_number : 'BOX-0001';
+  const totalBooks = boxRecord
+    ? (Array.isArray(boxRecord.books) ? boxRecord.books.length : (boxRecord.book_count || 0))
+    : 0;
+  const sealedBy = ((boxRecord && boxRecord.sealed_by) || currentOperatorName || 'OPERATOR').toUpperCase();
+  const dateStr = (boxRecord && boxRecord.assigned_at)
+    ? new Date(boxRecord.assigned_at).toLocaleDateString()
+    : new Date().toLocaleDateString();
+
+  return `
+    <div class="batch-slip-card">
+      <div class="batch-slip-category">${escapeHtml(cfg.printHeader)}</div>
+      <div class="batch-slip-boxnum">${escapeHtml(boxNum)}</div>
+      <div class="batch-slip-meta">
+        <div class="batch-slip-cell">
+          <div class="batch-slip-meta-label">TOTAL BOOKS</div>
+          <div class="batch-slip-meta-value mono">${escapeHtml(String(totalBooks))}</div>
+        </div>
+        <div class="batch-slip-cell">
+          <div class="batch-slip-meta-label">SEALED BY</div>
+          <div class="batch-slip-meta-value">${escapeHtml(sealedBy)}</div>
+        </div>
+        <div class="batch-slip-cell">
+          <div class="batch-slip-meta-label">DATE</div>
+          <div class="batch-slip-meta-value">${escapeHtml(dateStr)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function populatePrintSlip(boxRecord, modeId = activeMode) {
+  const html = buildBatchSlipCardHtml(boxRecord, modeId);
+  const slotEl = document.getElementById('printSlipSlot');
+  if (slotEl) slotEl.innerHTML = html;
+  const previewEl = document.getElementById('printPreviewBody');
+  if (previewEl) previewEl.innerHTML = html;
+}
+
 function printBoxLabel(boxRecord) {
-  if (boxRecord && boxRecord.rebox_number) {
-    const printHeaderEl = document.getElementById('printLabelHeader');
-    if (printHeaderEl) printHeaderEl.textContent = getModeConfig().printHeader;
-    const printRbEl = document.getElementById('printRbNumber');
-    if (printRbEl) printRbEl.textContent = boxRecord.rebox_number;
-    const printDetEl = document.getElementById('printDetails');
-    if (printDetEl) {
-      printDetEl.innerHTML = `
-        TOTAL BOOKS: ${boxRecord.book_count || (boxRecord.books || []).length}<br>
-        SEALED BY: ${(boxRecord.sealed_by || 'OPERATOR').toUpperCase()}<br>
-        DATE: ${new Date(boxRecord.assigned_at).toLocaleDateString()}<br>
-        STATUS: SEALED & AUDITED
-      `;
-    }
+  const targetBox = (boxRecord && boxRecord.rebox_number) ? boxRecord : window._currentInspectBox;
+  if (targetBox && targetBox.rebox_number) {
+    populatePrintSlip(targetBox, targetBox._modeId || activeMode);
   }
+  openModal('printPreviewModal');
+}
+
+function executePrintBoxLabel() {
   window.print();
 }
 
